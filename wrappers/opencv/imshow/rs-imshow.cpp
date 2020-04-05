@@ -38,10 +38,17 @@ auto max_optimization_iters = 50;
     {
     public:
 
-        std::string z_file = "C:/work/librealsense/build/wrappers/opencv/imshow/7/Z_GrayScale_1024x768_00.00.28.0628_F9440687_0001.raw";//"LongRange/13/Z_GrayScale_1024x768_00.01.21.3573_F9440687_0001.raw";
-        std::string i_file = "C:/work/librealsense/build/wrappers/opencv/imshow/7/I_GrayScale_1024x768_00.00.28.0628_F9440687_0001.raw";//"LongRange/13/I_GrayScale_1024x768_00.01.21.3573_F9440687_0000.raw";
-        std::string yuy2_file = "C:/work/librealsense/build/wrappers/opencv/imshow/7/YUY2_YUY2_1920x1080_00.00.27.9425_F9440687_0000.raw";
-        std::string yuy2_prev_file = "C:/work/librealsense/build/wrappers/opencv/imshow/7/YUY2_YUY2_1920x1080_00.00.27.9425_F9440687_0000.raw";
+        std::string z_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/Z_GrayScale_1024x768_00.00.28.0628_F9440687_0001.raw";
+        std::string i_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/I_GrayScale_1024x768_00.00.28.0628_F9440687_0001.raw";
+        std::string yuy2_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/YUY2_YUY2_1920x1080_00.00.27.9425_F9440687_0000.raw";
+        std::string yuy2_prev_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/YUY2_YUY2_1920x1080_00.00.27.9425_F9440687_0000.raw";
+
+        //std::string z_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/3/Z_GrayScale_1024x768_00.01.33.1527_F9440687_0000.raw";//"LongRange/13/Z_GrayScale_1024x768_00.01.21.3573_F9440687_0001.raw";
+        //std::string i_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/3/I_GrayScale_1024x768_00.01.33.1195_F9440687_0000.raw";//"LongRange/13/I_GrayScale_1024x768_00.01.21.3573_F9440687_0000.raw";
+        //std::string yuy2_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/3/YUY2_YUY2_1920x1080_00.01.32.9120_F9440687_0000.raw";
+        //std::string yuy2_prev_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/3/YUY2_YUY2_1920x1080_00.01.32.9120_F9440687_0000.raw";
+
+       
 
         enum direction :uint8_t
         {
@@ -637,18 +644,24 @@ auto max_optimization_iters = 50;
         
         cv::Mat res_mat(height_z, width_z, CV_16U, res.frame.data());
         res.gradient_x = calc_vertical_gradient(res.frame, depth_intrinsics.width, depth_intrinsics.height);
-
+        cv::Mat res_mat1(height_z, width_z, CV_32F, res.gradient_x.data());
         res.gradient_y = calc_horizontal_gradient(res.frame, depth_intrinsics.width, depth_intrinsics.height);
 
         res.edges = calc_intensity(res.gradient_x, res.gradient_y);
 
         res.directions = get_direction(res.gradient_x, res.gradient_y);
+        
+        //std::sort(res.directions.begin(), res.directions.end());
         res.direction_deg = get_direction_deg(res.gradient_x, res.gradient_y);
+        
+
         res.supressed_edges = supressed_edges(res, ir_data, width_z, height_z);
 
         auto subpixels = calc_subpixels(res, ir_data, depth_intrinsics.width, depth_intrinsics.height);
         res.subpixels_x = subpixels.first;
         res.subpixels_y = subpixels.second;
+
+        //std::sort(res.subpixels_x.begin(), res.subpixels_x.end());
 
         res.closest = get_closest_edges(res, ir_data, depth_intrinsics.width, depth_intrinsics.height);
        
@@ -675,6 +688,8 @@ auto max_optimization_iters = 50;
                 else
                     res[i*image_widht + j] = std::max(res[i*image_widht + j], (std::max(res[i*image_widht + j - 1] * _params.gamma, res[(i - 1)*image_widht + j] * _params.gamma)));
             }
+
+        cv::Mat IDT_mat(height_yuy2, width_yuy2, CV_64F, res.data());
 
         for (int i = image_height - 1; i >= 0; i--)
             for (int j = image_widht - 1; j >= 0; j--)
@@ -714,13 +729,13 @@ auto max_optimization_iters = 50;
         cv::Mat res_mat(height_yuy2, width_yuy2, CV_8U, res.yuy2_frame.data());
 
         res.edges = calc_edges(res.yuy2_frame, rgb_intrinsics.width, rgb_intrinsics.height);
-        cv::Mat edges_mat(height_yuy2, width_yuy2, CV_32F, res.edges.data());
+        cv::Mat edges_mat(height_yuy2, width_yuy2, CV_64F, res.edges.data());
 
         res.edges_IDT = blure_edges(res.edges, rgb_intrinsics.width, rgb_intrinsics.height);
-        cv::Mat IDT_mat(height_yuy2, width_yuy2, CV_32F, res.edges_IDT.data());
+        cv::Mat IDT_mat(height_yuy2, width_yuy2, CV_64F, res.edges_IDT.data());
 
         res.edges_IDTx = calc_vertical_gradient(res.edges_IDT, rgb_intrinsics.width, rgb_intrinsics.height);
-        cv::Mat IDTx_mat(height_yuy2, width_yuy2, CV_32F, res.edges_IDTx.data());
+        cv::Mat IDTx_mat(height_yuy2, width_yuy2, CV_64F, res.edges_IDTx.data());
         
         res.edges_IDTy = calc_horizontal_gradient(res.edges_IDT, rgb_intrinsics.width, rgb_intrinsics.height);
         cv::Mat IDTy_mat(height_yuy2, width_yuy2, CV_32F, res.edges_IDTy.data());
@@ -763,6 +778,14 @@ auto max_optimization_iters = 50;
         return true;
     }
 
+    double get_max(double x, double y)
+    {
+        return x > y ? x : y;
+    }
+    double get_min(double x, double y)
+    {
+        return x < y ? x : y;
+    }
     std::vector<double> auto_cal_algo::calculate_weights(z_frame_data& z_data)
     {
         std::vector<double> res;
@@ -770,8 +793,8 @@ auto max_optimization_iters = 50;
         {
             if (z_data.supressed_edges[i])
                 z_data.weights.push_back(
-                    std::min(std::max((float)z_data.supressed_edges[i] - (float)_params.grad_z_min, 0.f), 
-                                (float)_params.grad_z_max - (float)_params.grad_z_min));
+                    get_min(get_max(z_data.supressed_edges[i] - _params.grad_z_min, (double)0),
+                                _params.grad_z_max - _params.grad_z_min));
         }
 
         return res;
@@ -994,6 +1017,13 @@ auto max_optimization_iters = 50;
     double auto_cal_algo::calc_cost(const z_frame_data & z_data, const yuy2_frame_data& yuy_data, const std::vector<float2>& uv)
     {
         auto d_vals = biliniar_interp(yuy_data.edges_IDT, width_yuy2, height_yuy2, uv);
+        std::ofstream f;
+        f.open("d_vals");
+        for (auto i = 0; i < d_vals.size(); i++)
+        {
+            f << d_vals[i] << std::endl;
+
+        }
         double cost = 0;
 
         auto sum_of_elements = 0;
@@ -1019,13 +1049,24 @@ auto max_optimization_iters = 50;
         f.open("res");
         for (auto i = 0; i < interp_IDT_x.size(); i++)
         {
-            f << uv[i].x<<" "<< uv[i].y << std::endl;
+            f << interp_IDT_x[i] << std::endl;
         }
        
         auto interp_IDT_y = biliniar_interp(yuy_data.edges_IDTy, width_yuy2, height_yuy2, uv);
 
         auto rc = calc_rc(z_data, yuy_data, curr_calib);
-        
+        std::ofstream f1;
+        f1.open("f1");
+        for (auto i = 0; i < interp_IDT_x.size(); i++)
+        {
+            f1<< rc.first[i].x<<" "<< rc.first[i].y << std::endl;
+        }
+        std::ofstream f2;
+        f2.open("rc");
+        for (auto i = 0; i < interp_IDT_x.size(); i++)
+        {
+            f2 << rc.second[i]  << std::endl;
+        }
         auto intrin_extrin = calib_to_intrinsics_extrinsics(curr_calib);
 
         res.rot_angles = calc_rotation_gradients(z_data, yuy_data, interp_IDT_x, interp_IDT_y, intrin_extrin.first, intrin_extrin.second, rc.second, rc.first);
@@ -1066,7 +1107,47 @@ auto max_optimization_iters = 50;
     auto_cal_algo::rotation_in_angles auto_cal_algo::calc_rotation_gradients(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy)
     {
         auto coefs = calc_rotation_coefs(z_data, yuy_data, yuy_intrin, yuy_extrin, rc, xy);
+        std::ofstream f;
+        f.open("coefs_x");
+        f.precision(17);
+        for (auto i = 0; i < coefs.x_coeffs.size(); i++)
+        {
+            f << std::fixed << coefs.x_coeffs[i].alpha << " " << std::fixed << coefs.x_coeffs[i].beta <<" " << std::fixed << coefs.x_coeffs[i].gamma << std::endl;
+
+        }
+        std::ofstream f1;
+        f1.open("coefs_y");
+        f1.precision(17);
+        for (auto i = 0; i < coefs.y_coeffs.size(); i++)
+        {
+            f1 << std::fixed << coefs.y_coeffs[i].alpha << " " << std::fixed << coefs.y_coeffs[i].beta << " " << std::fixed << coefs.y_coeffs[i].gamma << std::endl;
+
+        }
         auto w = z_data.weights;
+
+        std::ofstream f2;
+        f2.open("w");
+        for (auto i = 0; i < coefs.y_coeffs.size(); i++)
+        {
+            f2 << w[i]<< std::endl;
+
+        }
+
+        std::ofstream f3;
+        f3.open("idtx");
+        for (auto i = 0; i < coefs.y_coeffs.size(); i++)
+        {
+            f3 << interp_IDT_x[i] << std::endl;
+
+        }
+
+        std::ofstream f4;
+        f4.open("idty");
+        for (auto i = 0; i < coefs.y_coeffs.size(); i++)
+        {
+            f4 << interp_IDT_y[i] << std::endl;
+
+        }
 
         rotation_in_angles sums = { 0 };
         double sum_alpha = 0;
@@ -1143,20 +1224,44 @@ auto max_optimization_iters = 50;
         auto yuy_intrin = intrin_extrin.first;
         auto yuy_extrin = intrin_extrin.second;
 
+        auto fx = yuy_intrin.fx;
+        auto fy = yuy_intrin.fy;
+        auto ppx = yuy_intrin.ppx;
+        auto ppy = yuy_intrin.ppy;
+
+        auto r = yuy_extrin.rotation;
+        auto t = yuy_extrin.translation;
+
+        float mat[3][4] = {
+            fx*r[0] + ppx * r[2], fx*r[3] + ppx * r[5], fx*r[6] + ppx * r[8], fx*t[0] + ppx * t[2],
+            fy*r[1] + ppy * r[2], fy*r[4] + ppy * r[5], fy*r[7] + ppy * r[8], fy*t[1] + ppy * t[2],
+            r[2], r[5], r[8], t[2] };
+
+        
         for (auto i = 0; i < z_data.vertices.size(); ++i)
         {
-            rs2_vertex p = {};
-            rs2_transform_point_to_point(&p.xyz[0], &yuy_extrin, &v[i].xyz[0]);
-            f1[i].x = p.xyz[0] * yuy_intrin.fx + yuy_intrin.ppx*p.xyz[2];
-            f1[i].x /= p.xyz[2];
-            f1[i].x = (f1[i].x - yuy_intrin.ppx) / yuy_intrin.fx;
+            //rs2_vertex p = {};
+            //rs2_transform_point_to_point(&p.xyz[0], &yuy_extrin, &v[i].xyz[0]);
+            auto x = v[i].xyz[0];
+            auto y = v[i].xyz[1];
+            auto z = v[i].xyz[2];
 
-            f1[i].y = p.xyz[1] * yuy_intrin.fy + yuy_intrin.ppy*p.xyz[2];
-            f1[i].y /= p.xyz[2];
-            f1[i].y = (f1[i].y - yuy_intrin.ppy) / yuy_intrin.fy;
+            x = (double)mat[0][0] * (double)x + (double)mat[0][1] * (double)y + (double)mat[0][2] * (double)z + (double)mat[0][3];
+            y = (double)mat[1][0] * (double)x + (double)mat[1][1] * (double)y + (double)mat[1][2] * (double)z + (double)mat[1][3];
+            z = (double)mat[2][0] * (double)x + (double)mat[2][1] * (double)y + (double)mat[2][2] * (double)z + (double)mat[2][3];
 
-            r2[i] = f1[i].x*f1[i].x + f1[i].y*f1[i].y;
-            rc[i] = 1 + yuy_intrin.coeffs[0] * r2[i] + yuy_intrin.coeffs[1] * r2[i] * r2[i] + yuy_intrin.coeffs[4] * r2[i] * r2[i] * r2[i];
+            auto x_in = x / z;
+            auto y_in = y / z;
+
+            auto x1 = ((x_in - ppx) / fx);
+            auto y1 = ((y_in - ppy) / fy);
+            auto r2 = (x1 * x1 + y1 * y1);
+
+           
+            f1[i].x = x1;
+            f1[i].y = y1;
+
+            rc[i] = 1 + yuy_intrin.coeffs[0] * r2 + yuy_intrin.coeffs[1] * r2 * r2 + yuy_intrin.coeffs[4] * r2 * r2 * r2;
         }
 
         return { f1,rc };
@@ -1840,21 +1945,31 @@ auto max_optimization_iters = 50;
         float depth_units = 0.25f;
 
         auto yuy_data = preprocess_yuy2_data(rgb_intrinsics);
+       
+
         auto ir_data = preprocess_ir();
         auto z_data = preproccess_z(ir_data, depth_intrin, depth_units);
 
 
+        //std::sort(z_data.edges.begin(), z_data.edges.end());
+
+        std::ofstream f;
+        f.open("edges_z");
+        for (auto i = 0; i < z_data.edges.size(); i++)
+        {
+            f << z_data.edges[i] << std::endl;
+
+        }
         rs2_extrinsics extrinsics = { { 0.99970001, -0.021156590, 0.012339020,
                                        0.021360161, 0.99963391, -0.016606549,
                                       -0.011983165, 0.016865131, 0.99978596 },
                                        1.1025798, 13.548738, -6.8803735 };
 
-
-
         optimaization_params params_orig;
         params_orig.curr_calib = intrinsics_extrinsics_to_calib(rgb_intrinsics, extrinsics);
 
         auto optimized = false;
+        //std::sort(z_data.vertices.begin(), z_data.vertices.end(), [](rs2_vertex v1, rs2_vertex v2) {return v1.xyz[0] < v2.xyz[0]; });
 
         auto cost = calc_cost_and_grad(z_data, yuy_data, params_orig.curr_calib);
         std::cout << "Original cost = " << cost.second << std::endl;
@@ -1883,6 +1998,7 @@ auto max_optimization_iters = 50;
         std::cout << "Optimaized cost = " << params_curr.cost << std::endl;
 
         return optimized;
+        return 0;
     }
 
 int main()
@@ -2061,9 +2177,9 @@ auto_cal_algo::calib auto_cal_algo::calib::normalize()
     }
 
     calib res;
-    res.rot_angles = { res_grads[0], res_grads[1], res_grads[2] };
-    res.trans = { res_grads[3], res_grads[4], res_grads[5] };
-    res.k_mat = { res_grads[6], res_grads[7], res_grads[8], res_grads[9] };
+    res.rot_angles = { (float)res_grads[0], (float)res_grads[1], (float)res_grads[2] };
+    res.trans = { (float)res_grads[3], (float)res_grads[4], (float)res_grads[5] };
+    res.k_mat = { (float)res_grads[6], (float)res_grads[7], (float)res_grads[8], (float)res_grads[9] };
 
     return res;
 }

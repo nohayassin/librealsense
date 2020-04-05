@@ -25,6 +25,18 @@ namespace librealsense
     {
     }
 
+    template<class T>
+    std::vector<T> get_image(std::string file, uint32_t width, uint32_t height, bool simulate = false)
+    {
+        std::ifstream f;
+        f.open(file, std::ios::binary);
+        if (!f.good())
+            throw "invalid file";
+        std::vector<T> data(width * height);
+        f.read((char*)data.data(), width * height * sizeof(T));
+        return data;
+    }
+
     bool auto_cal_algo::optimize()
     {
         std::cout << "-D- old intr"
@@ -624,12 +636,12 @@ namespace librealsense
 
         for (auto i = 0; i < uv.size(); i++)
         {
-            auto x = uv[i].x;
-            auto x1 = floor(x);
-            auto x2 = ceil(x);
-            auto y = uv[i].y;
-            auto y1 = floor(y);
-            auto y2 = ceil(y);
+            double x = uv[i].x;
+            double x1 = floor(x);
+            double x2 = ceil(x);
+            double y = uv[i].y;
+            double y1 = floor(y);
+            double y2 = ceil(y);
 
             if (x1 < 0 || x1 >= width || x2 < 0 || x2 >= width ||
                 y1 < 0 || y1 >= height || y2 < 0 || y2 >= height)
@@ -903,20 +915,43 @@ namespace librealsense
         auto yuy_intrin = intrin_extrin.first;
         auto yuy_extrin = intrin_extrin.second;
 
+        auto fx = (double)yuy_intrin.fx;
+        auto fy = (double)yuy_intrin.fy;
+        auto ppx = (double)yuy_intrin.ppx;
+        auto ppy = (double)yuy_intrin.ppy;
+
+        auto r = yuy_extrin.rotation;
+        auto t = yuy_extrin.translation;
+
+        double mat[3][4] = {
+            fx*(double)r[0] + ppx * (double)r[2], fx*(double)r[3] + ppx * (double)r[5], fx*(double)r[6] + ppx * (double)r[8], fx*(double)t[0] + ppx * (double)t[2],
+            fy*(double)r[1] + ppy * (double)r[2], fy*(double)r[4] + ppy * (double)r[5], fy*(double)r[7] + ppy * (double)r[8], fy*(double)t[1] + ppy * (double)t[2],
+            (double)r[2], (double)r[5], (double)r[8], (double)t[2] };
+
+
         for (auto i = 0; i < z_data.vertices.size(); ++i)
         {
-            rs2_vertex p = {};
-            rs2_transform_point_to_point(&p.xyz[0], &yuy_extrin, &v[i].xyz[0]);
-            f1[i].x = p.xyz[0] * yuy_intrin.fx + yuy_intrin.ppx*p.xyz[2];
-            f1[i].x /= p.xyz[2];
-            f1[i].x = (f1[i].x - yuy_intrin.ppx) / yuy_intrin.fx;
+            //rs2_vertex p = {};
+            //rs2_transform_point_to_point(&p.xyz[0], &yuy_extrin, &v[i].xyz[0]);
+            auto x = v[i].xyz[0];
+            auto y = v[i].xyz[1];
+            auto z = v[i].xyz[2];
 
-            f1[i].y = p.xyz[1] * yuy_intrin.fy + yuy_intrin.ppy*p.xyz[2];
-            f1[i].y /= p.xyz[2];
-            f1[i].y = (f1[i].y - yuy_intrin.ppy) / yuy_intrin.fy;
+            x = (double)mat[0][0] * (double)x + (double)mat[0][1] * (double)y + (double)mat[0][2] * (double)z + (double)mat[0][3];
+            y = (double)mat[1][0] * (double)x + (double)mat[1][1] * (double)y + (double)mat[1][2] * (double)z + (double)mat[1][3];
+            z = (double)mat[2][0] * (double)x + (double)mat[2][1] * (double)y + (double)mat[2][2] * (double)z + (double)mat[2][3];
 
-            r2[i] = f1[i].x*f1[i].x + f1[i].y*f1[i].y;
-            rc[i] = 1 + yuy_intrin.coeffs[0] * r2[i] + yuy_intrin.coeffs[1] * r2[i] * r2[i] + yuy_intrin.coeffs[4] * r2[i] * r2[i] * r2[i];
+            auto x_in = x / z;
+            auto y_in = y / z;
+
+            auto x1 = ((x_in - ppx) / fx);
+            auto y1 = ((y_in - ppy) / fy);
+            auto r2 = (x1 * x1 + y1 * y1);
+
+            f1[i].x = x1;
+            f1[i].y = y1;
+
+            rc[i] = 1 + yuy_intrin.coeffs[0] * r2 + yuy_intrin.coeffs[1] * r2 * r2 + yuy_intrin.coeffs[4] * r2 * r2 * r2;
         }
 
         return { f1,rc };
