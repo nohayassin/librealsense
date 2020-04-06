@@ -61,12 +61,20 @@ namespace librealsense
             << std::endl;
 
         auto yuy_data = preprocess_yuy2_data(yuy, prev_yuy);
-        auto ir_data = preprocess_ir(ir);
-
-        auto depth_units = depth.as<rs2::depth_frame>().get_units();
+        std::ofstream f;
+        f.open("yuy_data", std::ios::binary);
+        f.write((char*)yuy_data.yuy2_frame.data(), yuy_data.yuy2_frame.size());
+          auto ir_data = preprocess_ir(ir);
+        std::ofstream f1;
+        f1.open("ir_data", std::ios::binary);
+        f1.write((char*)ir_data.ir_frame.data(), ir_data.ir_frame.size());
+          auto depth_units = depth.as<rs2::depth_frame>().get_units();
         auto vf = depth.get_profile().as<rs2::video_stream_profile>();
 
         auto z_data = preproccess_z(depth, ir_data, vf.get_intrinsics(), depth_units);
+        std::ofstream f2;
+        f2.open("z_data", std::ios::binary);
+        f2.write((char*)z_data.frame.data(), z_data.frame.size());
 
         optimaization_params params_orig;
         params_orig.curr_calib = intrinsics_extrinsics_to_calib(_intr, _extr);
@@ -75,6 +83,7 @@ namespace librealsense
 
         auto cost = calc_cost_and_grad(z_data, yuy_data, params_orig.curr_calib);
         std::cout << "Original cost = " << cost.second << std::endl;
+        LOG_ERROR("Original cost = " << cost.second);
 
         optimaization_params params_curr = params_orig;
 
@@ -94,6 +103,7 @@ namespace librealsense
 
             params_curr = new_params;
             std::cout << "Current optimaized cost = " << params_curr.cost << std::endl;
+            LOG_ERROR("Current optimaized cost = " << params_curr.cost);
 
             optimized = true;
         }
@@ -179,7 +189,6 @@ namespace librealsense
         res.yuy2_frame = get_luminance_from_yuy2(color_frame);
         
         res.edges = calc_edges(res.yuy2_frame, vf.width(), vf.height());
-        
         res.edges_IDT = blure_edges(res.edges, vf.width(), vf.height());
         
         res.edges_IDTx = calc_vertical_gradient(res.edges_IDT, vf.width(), vf.height());
@@ -931,27 +940,26 @@ namespace librealsense
 
         for (auto i = 0; i < z_data.vertices.size(); ++i)
         {
-            //rs2_vertex p = {};
-            //rs2_transform_point_to_point(&p.xyz[0], &yuy_extrin, &v[i].xyz[0]);
-            auto x = v[i].xyz[0];
-            auto y = v[i].xyz[1];
-            auto z = v[i].xyz[2];
+            double x = v[i].xyz[0];
+            double y = v[i].xyz[1];
+            double z = v[i].xyz[2];
 
-            x = (double)mat[0][0] * (double)x + (double)mat[0][1] * (double)y + (double)mat[0][2] * (double)z + (double)mat[0][3];
-            y = (double)mat[1][0] * (double)x + (double)mat[1][1] * (double)y + (double)mat[1][2] * (double)z + (double)mat[1][3];
-            z = (double)mat[2][0] * (double)x + (double)mat[2][1] * (double)y + (double)mat[2][2] * (double)z + (double)mat[2][3];
+            double x1 = (double)mat[0][0] * (double)x + (double)mat[0][1] * (double)y + (double)mat[0][2] * (double)z + (double)mat[0][3];
+            double y1 = (double)mat[1][0] * (double)x + (double)mat[1][1] * (double)y + (double)mat[1][2] * (double)z + (double)mat[1][3];
+            double z1 = (double)mat[2][0] * (double)x + (double)mat[2][1] * (double)y + (double)mat[2][2] * (double)z + (double)mat[2][3];
 
-            auto x_in = x / z;
-            auto y_in = y / z;
+            auto x_in = x1 / z1;
+            auto y_in = y1 / z1;
 
-            auto x1 = ((x_in - ppx) / fx);
-            auto y1 = ((y_in - ppy) / fy);
-            auto r2 = (x1 * x1 + y1 * y1);
+            auto x2 = ((x_in - ppx) / fx);
+            auto y2 = ((y_in - ppy) / fy);
 
-            f1[i].x = x1;
-            f1[i].y = y1;
+            f1[i].x = x2;
+            f1[i].y = y2;
 
-            rc[i] = 1 + yuy_intrin.coeffs[0] * r2 + yuy_intrin.coeffs[1] * r2 * r2 + yuy_intrin.coeffs[4] * r2 * r2 * r2;
+            auto r2 = (x2 * x2 + y2 * y2);
+
+            rc[i] = 1 + (double)yuy_intrin.coeffs[0] * r2 + (double)yuy_intrin.coeffs[1] * r2 * r2 + (double)yuy_intrin.coeffs[4] * r2 * r2 * r2;
         }
 
         return { f1,rc };
@@ -1823,6 +1831,7 @@ namespace librealsense
         cal.coeffs[3] = coeffs[3];
         cal.coeffs[4] = coeffs[4];
         cal.model = intrin.model;
+
 
         return cal;
     }

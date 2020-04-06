@@ -368,6 +368,7 @@ namespace librealsense
         void auto_calibration::start()
         {
             AC_LOG( DEBUG, "starting processing ..." );
+            LOG_DEBUG("starting processing ...");
             _is_processing = true;
             if( _worker.joinable() )
                 _worker.join();
@@ -376,6 +377,7 @@ namespace librealsense
                 try
                 {
                     AC_LOG( DEBUG, "auto calibration has started ...");
+                    LOG_ERROR("auto calibration has started ...");
                     call_back( RS2_CALIBRATION_STARTED );
 
                     auto df = _sf.get_depth_frame();
@@ -394,6 +396,7 @@ namespace librealsense
                     else if( algo.optimize() )
                     {
                         AC_LOG( DEBUG, "optimization successful!" );
+                        LOG_ERROR("optimization successful!");
                         /*  auto prof = _cf.get_profile().get()->profile;
                         auto&& video = dynamic_cast<video_stream_profile_interface*>(prof);
                         if (video)
@@ -419,6 +422,7 @@ namespace librealsense
                 catch (...)
                 {
                     AC_LOG( ERROR, "unknown exception!!!" );
+                    LOG_ERROR("unknown exception!!!");
                     call_back( RS2_CALIBRATION_FAILED );
                     reset();
                 }});
