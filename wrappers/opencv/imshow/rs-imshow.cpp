@@ -38,17 +38,21 @@ auto max_optimization_iters = 50;
     {
     public:
 
-        std::string z_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/Z_GrayScale_1024x768_00.00.28.0628_F9440687_0001.raw";
+       /* std::string z_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/Z_GrayScale_1024x768_00.00.28.0628_F9440687_0001.raw";
         std::string i_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/I_GrayScale_1024x768_00.00.28.0628_F9440687_0001.raw";
         std::string yuy2_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/YUY2_YUY2_1920x1080_00.00.27.9425_F9440687_0000.raw";
-        std::string yuy2_prev_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/YUY2_YUY2_1920x1080_00.00.27.9425_F9440687_0000.raw";
+        std::string yuy2_prev_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/YUY2_YUY2_1920x1080_00.00.27.9425_F9440687_0000.raw";*/
 
-        //std::string z_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/3/Z_GrayScale_1024x768_00.01.33.1527_F9440687_0000.raw";//"LongRange/13/Z_GrayScale_1024x768_00.01.21.3573_F9440687_0001.raw";
-        //std::string i_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/3/I_GrayScale_1024x768_00.01.33.1195_F9440687_0000.raw";//"LongRange/13/I_GrayScale_1024x768_00.01.21.3573_F9440687_0000.raw";
-        //std::string yuy2_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/3/YUY2_YUY2_1920x1080_00.01.32.9120_F9440687_0000.raw";
-        //std::string yuy2_prev_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/3/YUY2_YUY2_1920x1080_00.01.32.9120_F9440687_0000.raw";
+        //std::string z_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/2/Z_GrayScale_1024x768_00.00.26.7119_F9440687_0000.raw";//"LongRange/13/Z_GrayScale_1024x768_00.01.21.3573_F9440687_0001.raw";
+        //std::string i_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/2/I_GrayScale_1024x768_00.00.26.7119_F9440687_0000.raw";//"LongRange/13/I_GrayScale_1024x768_00.01.21.3573_F9440687_0000.raw";
+        //std::string yuy2_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/2/YUY2_YUY2_1920x1080_00.00.26.6355_F9440687_0000.raw";
+        //std::string yuy2_prev_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/2/YUY2_YUY2_1920x1080_00.00.26.6355_F9440687_0000.raw";
+        
+        std::string z_file = "C:/work/librealsense/build/tools/realsense-viewer/z_data";//"LongRange/13/Z_GrayScale_1024x768_00.01.21.3573_F9440687_0001.raw";
+        std::string i_file = "C:/work/librealsense/build/tools/realsense-viewer/ir_data";//"LongRange/13/I_GrayScale_1024x768_00.01.21.3573_F9440687_0000.raw";
+        std::string yuy2_file = "C:/work/librealsense/build/tools/realsense-viewer/yuy_data";
+        std::string yuy2_prev_file = "C:/work/librealsense/build/tools/realsense-viewer/yuy_data";
 
-       
 
         enum direction :uint8_t
         {
@@ -107,7 +111,7 @@ auto max_optimization_iters = 50;
 
         struct rotation
         {
-            float rot[9];
+            double rot[9];
         };
 
         struct k_matrix
@@ -254,7 +258,7 @@ auto max_optimization_iters = 50;
         std::pair<std::vector<double>, std::vector<double>> calc_subpixels(const z_frame_data& z_data, ir_frame_data ir_data, uint32_t width, uint32_t height);
         z_frame_data preproccess_z(const ir_frame_data & ir_data, rs2_intrinsics depth_intrinsics, float depth_units);
         std::vector<double> blure_edges(std::vector<double> edges, uint32_t image_widht, uint32_t image_height);
-        std::vector<uint8_t> get_luminance_from_yuy2(std::vector<uint16_t> yuy2_imagh);
+        std::vector<uint8_t> get_luminace_from_yuy2(std::vector<uint16_t> yuy2_imagh);
         yuy2_frame_data preprocess_yuy2_data(const rs2_intrinsics& rgb_intrinsics);
         ir_frame_data preprocess_ir();
         std::vector<uint8_t> get_logic_edges(std::vector<double> edges);
@@ -262,30 +266,29 @@ auto max_optimization_iters = 50;
         bool is_scene_valid(yuy2_frame_data yuy);
         std::vector<double> calculate_weights(z_frame_data& z_data);
         std::vector <rs2_vertex> subedges2vertices(z_frame_data& z_data, const rs2_intrinsics& intrin, double depth_units);
-        calib get_calib_gradients(const z_frame_data& z_data);
         optimaization_params back_tracking_line_search(const z_frame_data & z_data, const yuy2_frame_data& yuy_data, optimaization_params opt_params);
         double calc_step_size(optimaization_params opt_params);
         double calc_t(optimaization_params opt_params);
         std::pair<auto_cal_algo::calib, double> calc_cost_and_grad(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const calib& curr_calib);
         double calc_cost(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const std::vector<float2>& uv);
         calib calc_gradients(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const std::vector<float2>& uv, const calib& curr_calib);
-        translation calc_translation_gradients(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy);
-        rotation_in_angles calc_rotation_gradients(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy);
-        k_matrix calc_k_gradients(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy);
-        std::pair< std::vector<float2>, std::vector<double>> calc_rc(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const calib& curr_calib);
-        coeffs<translation> calc_translation_coefs(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy);
-        coeffs<rotation_in_angles> calc_rotation_coefs(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy);
-        coeffs<k_matrix> calc_k_gradients_coefs(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy);
-        k_matrix calculate_k_gradients_y_coeff(rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
-        k_matrix calculate_k_gradients_x_coeff(rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
-        translation calculate_translation_y_coeff(rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
-        translation calculate_translation_x_coeff(rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
-        double calculate_rotation_x_alpha_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
-        double calculate_rotation_x_beta_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
-        double calculate_rotation_x_gamma_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
-        double calculate_rotation_y_alpha_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
-        double calculate_rotation_y_beta_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
-        double calculate_rotation_y_gamma_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin);
+        translation calc_translation_gradients(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double, double>>& xy);
+        rotation_in_angles calc_rotation_gradients(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double, double>>& xy);
+        k_matrix calc_k_gradients(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double,double>>& xy);
+        std::pair< std::vector<std::pair< double, double>>, std::vector<double>> calc_rc(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const calib& curr_calib);
+        coeffs<translation> calc_translation_coefs(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double,double>>& xy);
+        coeffs<rotation_in_angles> calc_rotation_coefs(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double,double>>& xy);
+        coeffs<k_matrix> calc_k_gradients_coefs(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double,double>>& xy);
+        k_matrix calculate_k_gradients_y_coeff(rs2_vertex v, double rc, std::pair<double, double> xy, const calib& yuy_intrin_extrin);
+        k_matrix calculate_k_gradients_x_coeff(rs2_vertex v, double rc, std::pair<double, double> xy, const calib& yuy_intrin_extrin);
+        translation calculate_translation_y_coeff(rs2_vertex v, double rc, std::pair<double, double> xy, const calib& yuy_intrin_extrin);
+        translation calculate_translation_x_coeff(rs2_vertex v, double rc, std::pair<double,double> xy, const calib& yuy_intrin_extrinn);
+        double calculate_rotation_x_alpha_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib& yuy_intrin_extrin);
+        double calculate_rotation_x_beta_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib& yuy_intrin_extrin);
+        double calculate_rotation_x_gamma_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib& yuy_intrin_extrin);
+        double calculate_rotation_y_alpha_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib& yuy_intrin_extrin);
+        double calculate_rotation_y_beta_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib& yuy_intrin_extrin);
+        double calculate_rotation_y_gamma_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib& yuy_intrin_extrin);
         void deproject_sub_pixel(std::vector<rs2_vertex>& points, const rs2_intrinsics & intrin, const double * x, const double * y, const uint16_t * depth, double depth_units);
 
         params _params;
@@ -309,7 +312,7 @@ auto max_optimization_iters = 50;
 
         for (auto i = 0; i < sub_image.size(); i++)
         {
-            res += sub_image[i] * mask[i];
+            res += (double)sub_image[i] * (double)mask[i];
         }
 
         return res;
@@ -383,7 +386,7 @@ auto max_optimization_iters = 50;
 
 #include "../include/librealsense2/rsutil.h"
 
-    auto_cal_algo::rotation_in_angles extract_angles_from_rotation(const float rotation[9])
+    auto_cal_algo::rotation_in_angles extract_angles_from_rotation(const double rotation[9])
     {
         auto_cal_algo::rotation_in_angles res;
         auto epsilon = 0.00001;
@@ -641,10 +644,19 @@ auto max_optimization_iters = 50;
     {
         z_frame_data res;
         res.frame = get_depth_image(depth_intrinsics.width, depth_intrinsics.height);
-        
+        std::ofstream f;
+        f.open("res.frame");
+        for (auto i = 0; i < res.frame.size(); i++)
+        {
+            f << res.frame[i] << std::endl;
+
+        }
+
         cv::Mat res_mat(height_z, width_z, CV_16U, res.frame.data());
         res.gradient_x = calc_vertical_gradient(res.frame, depth_intrinsics.width, depth_intrinsics.height);
         cv::Mat res_mat1(height_z, width_z, CV_32F, res.gradient_x.data());
+        
+
         res.gradient_y = calc_horizontal_gradient(res.frame, depth_intrinsics.width, depth_intrinsics.height);
 
         res.edges = calc_intensity(res.gradient_x, res.gradient_y);
@@ -710,7 +722,7 @@ auto max_optimization_iters = 50;
         return res;
     }
 
-    std::vector<uint8_t> auto_cal_algo::get_luminance_from_yuy2(std::vector<uint16_t> yuy2_imagh)
+    std::vector<uint8_t> auto_cal_algo::get_luminace_from_yuy2(std::vector<uint16_t> yuy2_imagh)
     {
         std::vector<uint8_t> res(yuy2_imagh.size(), 0);
         auto yuy2 = (uint8_t*)yuy2_imagh.data();
@@ -725,7 +737,7 @@ auto max_optimization_iters = 50;
         yuy2_frame_data res;
 
         auto yuy2_data = get_yuy2_image(rgb_intrinsics.width, rgb_intrinsics.height);
-        res.yuy2_frame = get_luminance_from_yuy2(yuy2_data);
+        res.yuy2_frame = get_luminace_from_yuy2(yuy2_data);
         cv::Mat res_mat(height_yuy2, width_yuy2, CV_8U, res.yuy2_frame.data());
 
         res.edges = calc_edges(res.yuy2_frame, rgb_intrinsics.width, rgb_intrinsics.height);
@@ -736,12 +748,12 @@ auto max_optimization_iters = 50;
 
         res.edges_IDTx = calc_vertical_gradient(res.edges_IDT, rgb_intrinsics.width, rgb_intrinsics.height);
         cv::Mat IDTx_mat(height_yuy2, width_yuy2, CV_64F, res.edges_IDTx.data());
-        
+
         res.edges_IDTy = calc_horizontal_gradient(res.edges_IDT, rgb_intrinsics.width, rgb_intrinsics.height);
         cv::Mat IDTy_mat(height_yuy2, width_yuy2, CV_32F, res.edges_IDTy.data());
-       
+
         auto yuy2_data_prev = get_yuy2_prev_image(rgb_intrinsics.width, rgb_intrinsics.height);
-        res.yuy2_prev_frame = get_luminance_from_yuy2(yuy2_data_prev);
+        res.yuy2_prev_frame = get_luminace_from_yuy2(yuy2_data_prev);
 
         return res;
     }
@@ -899,7 +911,7 @@ auto max_optimization_iters = 50;
             if (x1 < 0 || x1 >= width || x2 < 0 || x2 >= width ||
                 y1 < 0 || y1 >= height || y2 < 0 || y2 >= height)
             {
-                res[i] = std::numeric_limits<double>::max();
+                res[i] = 0;
                 continue;
             }
 
@@ -936,14 +948,6 @@ auto max_optimization_iters = 50;
             res[i] = interp_y_x;
         }
         return res;
-    }
-
-    
-
-    auto_cal_algo::calib auto_cal_algo::get_calib_gradients(const z_frame_data& z_data)
-    {
-
-        return calib();
     }
 
     auto_cal_algo::optimaization_params auto_cal_algo::back_tracking_line_search(const z_frame_data & z_data, const yuy2_frame_data& yuy_data, auto_cal_algo::optimaization_params curr_params)
@@ -1029,7 +1033,7 @@ auto max_optimization_iters = 50;
         auto sum_of_elements = 0;
         for (auto i = 0;i < d_vals.size(); i++)
         {
-            if (d_vals[i] != std::numeric_limits<double>::max())
+            if (d_vals[i] != 0)
             {
                 sum_of_elements++;
                 cost += d_vals[i] * z_data.weights[i];
@@ -1059,7 +1063,7 @@ auto max_optimization_iters = 50;
         f1.open("f1");
         for (auto i = 0; i < interp_IDT_x.size(); i++)
         {
-            f1<< rc.first[i].x<<" "<< rc.first[i].y << std::endl;
+            f1<< rc.first[i].first<<" "<< rc.first[i].second << std::endl;
         }
         std::ofstream f2;
         f2.open("rc");
@@ -1069,16 +1073,16 @@ auto max_optimization_iters = 50;
         }
         auto intrin_extrin = calib_to_intrinsics_extrinsics(curr_calib);
 
-        res.rot_angles = calc_rotation_gradients(z_data, yuy_data, interp_IDT_x, interp_IDT_y, intrin_extrin.first, intrin_extrin.second, rc.second, rc.first);
-        res.trans = calc_translation_gradients(z_data, yuy_data, interp_IDT_x, interp_IDT_y, intrin_extrin.first, intrin_extrin.second, rc.second, rc.first);
-        res.k_mat = calc_k_gradients(z_data, yuy_data, interp_IDT_x, interp_IDT_y, intrin_extrin.first, intrin_extrin.second, rc.second, rc.first);
-
+        res.rot_angles = calc_rotation_gradients(z_data, yuy_data, interp_IDT_x, interp_IDT_y, curr_calib, rc.second, rc.first);
+        res.trans = calc_translation_gradients(z_data, yuy_data, interp_IDT_x, interp_IDT_y, curr_calib, rc.second, rc.first);
+        res.k_mat = calc_k_gradients(z_data, yuy_data, interp_IDT_x, interp_IDT_y, curr_calib, rc.second, rc.first);
+        res.rot = extract_rotation_from_angles(res.rot_angles);
         return res;
     }
 
-    auto_cal_algo::translation auto_cal_algo::calc_translation_gradients(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy)
+    auto_cal_algo::translation auto_cal_algo::calc_translation_gradients(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const calib& yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double, double>>& xy)
     {
-        auto coefs = calc_translation_coefs(z_data, yuy_data, yuy_intrin, yuy_extrin, rc, xy);
+        auto coefs = calc_translation_coefs(z_data, yuy_data, yuy_intrin_extrin, rc, xy);
         auto w = z_data.weights;
         
         translation sums = { 0 };
@@ -1086,7 +1090,7 @@ auto max_optimization_iters = 50;
 
         for (auto i = 0; i < coefs.x_coeffs.size(); i++)
         {
-            if (interp_IDT_x[i] == std::numeric_limits<double>::max() || interp_IDT_y[i] == std::numeric_limits<double>::max())
+            if (interp_IDT_x[i] == 0|| interp_IDT_y[i] == 0)
                 continue;
 
             sum_of_valids++;
@@ -1104,26 +1108,31 @@ auto max_optimization_iters = 50;
         return averages;
     }
 
-    auto_cal_algo::rotation_in_angles auto_cal_algo::calc_rotation_gradients(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy)
+    auto_cal_algo::rotation_in_angles auto_cal_algo::calc_rotation_gradients(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double, double>>& xy)
     {
-        auto coefs = calc_rotation_coefs(z_data, yuy_data, yuy_intrin, yuy_extrin, rc, xy);
+        auto coefs = calc_rotation_coefs(z_data, yuy_data, yuy_intrin_extrin, rc, xy);
+        auto w = z_data.weights;
         std::ofstream f;
         f.open("coefs_x");
         f.precision(17);
         for (auto i = 0; i < coefs.x_coeffs.size(); i++)
         {
-            f << std::fixed << coefs.x_coeffs[i].alpha << " " << std::fixed << coefs.x_coeffs[i].beta <<" " << std::fixed << coefs.x_coeffs[i].gamma << std::endl;
+            f << std::fixed << coefs.x_coeffs[i].beta <<" "<< 
+                 std::fixed << interp_IDT_x[i]<<" "<<
+                 std::fixed << coefs.y_coeffs[i].beta <<" "<<
+                 std::fixed << interp_IDT_y[i] << " " << 
+                 std::fixed << w[i] << std::endl;
 
         }
-        std::ofstream f1;
+      /*  std::ofstream f1;
         f1.open("coefs_y");
         f1.precision(17);
         for (auto i = 0; i < coefs.y_coeffs.size(); i++)
         {
-            f1 << std::fixed << coefs.y_coeffs[i].alpha << " " << std::fixed << coefs.y_coeffs[i].beta << " " << std::fixed << coefs.y_coeffs[i].gamma << std::endl;
+            f1 << std::fixed << coefs.y_coeffs[i].beta <<  std::endl;
 
         }
-        auto w = z_data.weights;
+        
 
         std::ofstream f2;
         f2.open("w");
@@ -1140,14 +1149,14 @@ auto max_optimization_iters = 50;
             f3 << interp_IDT_x[i] << std::endl;
 
         }
-
-        std::ofstream f4;
+*/
+      /*  std::ofstream f4;
         f4.open("idty");
         for (auto i = 0; i < coefs.y_coeffs.size(); i++)
         {
             f4 << interp_IDT_y[i] << std::endl;
 
-        }
+        }*/
 
         rotation_in_angles sums = { 0 };
         double sum_alpha = 0;
@@ -1159,7 +1168,7 @@ auto max_optimization_iters = 50;
         for (auto i = 0; i < coefs.x_coeffs.size(); i++)
         {
 
-            if (interp_IDT_x[i] == std::numeric_limits<double>::max() || interp_IDT_y[i] == std::numeric_limits<double>::max())
+            if (interp_IDT_x[i] == 0 || interp_IDT_y[i] == 0)
                 continue;
 
             sum_of_valids++;
@@ -1177,9 +1186,9 @@ auto max_optimization_iters = 50;
         return averages;
     }
 
-    auto_cal_algo::k_matrix auto_cal_algo::calc_k_gradients(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy)
+    auto_cal_algo::k_matrix auto_cal_algo::calc_k_gradients(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, std::vector<double> interp_IDT_x, std::vector<double> interp_IDT_y, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double,double>>& xy)
     {
-        auto coefs = calc_k_gradients_coefs(z_data, yuy_data, yuy_intrin, yuy_extrin, rc, xy);
+        auto coefs = calc_k_gradients_coefs(z_data, yuy_data, yuy_intrin_extrin, rc, xy);
         auto w = z_data.weights;
 
         rotation_in_angles sums = { 0 };
@@ -1193,7 +1202,7 @@ auto max_optimization_iters = 50;
         for (auto i = 0; i < coefs.x_coeffs.size(); i++)
         {
 
-            if (interp_IDT_x[i] == std::numeric_limits<double>::max() || interp_IDT_y[i] == std::numeric_limits<double>::max())
+            if (interp_IDT_x[i] == 0 || interp_IDT_y[i] == 0)
                 continue;
 
             sum_of_valids++;
@@ -1212,11 +1221,11 @@ auto max_optimization_iters = 50;
         return averages;
     }
 
-    std::pair< std::vector<float2>,std::vector<double>> auto_cal_algo::calc_rc(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, const calib& curr_calib)
+    std::pair< std::vector<std::pair< double, double>>,std::vector<double>> auto_cal_algo::calc_rc(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, const calib& curr_calib)
     {
         auto v = z_data.vertices;
        
-        std::vector<float2> f1(z_data.vertices.size());
+        std::vector<std::pair<double, double>> f1(z_data.vertices.size());
         std::vector<double> r2(z_data.vertices.size());
         std::vector<double> rc(z_data.vertices.size());
 
@@ -1224,66 +1233,72 @@ auto max_optimization_iters = 50;
         auto yuy_intrin = intrin_extrin.first;
         auto yuy_extrin = intrin_extrin.second;
 
-        auto fx = yuy_intrin.fx;
-        auto fy = yuy_intrin.fy;
-        auto ppx = yuy_intrin.ppx;
-        auto ppy = yuy_intrin.ppy;
+        auto fx = (double)yuy_intrin.fx;
+        auto fy = (double)yuy_intrin.fy;
+        auto ppx = (double)yuy_intrin.ppx;
+        auto ppy = (double)yuy_intrin.ppy;
 
         auto r = yuy_extrin.rotation;
         auto t = yuy_extrin.translation;
 
-        float mat[3][4] = {
-            fx*r[0] + ppx * r[2], fx*r[3] + ppx * r[5], fx*r[6] + ppx * r[8], fx*t[0] + ppx * t[2],
-            fy*r[1] + ppy * r[2], fy*r[4] + ppy * r[5], fy*r[7] + ppy * r[8], fy*t[1] + ppy * t[2],
+        double mat[3][4] = {
+            fx*(double)r[0] + ppx * (double)r[2], fx*(double)r[3] + ppx * (double)r[5], fx*(double)r[6] + ppx * (double)r[8], fx*(double)t[0] + ppx * (double)t[2],
+            fy*(double)r[1] + ppy * (double)r[2], fy*(double)r[4] + ppy * (double)r[5], fy*(double)r[7] + ppy * (double)r[8], fy*(double)t[1] + ppy * (double)t[2],
             r[2], r[5], r[8], t[2] };
 
-        
+        std::ofstream f;
+        f.open("v");
         for (auto i = 0; i < z_data.vertices.size(); ++i)
         {
             //rs2_vertex p = {};
             //rs2_transform_point_to_point(&p.xyz[0], &yuy_extrin, &v[i].xyz[0]);
-            auto x = v[i].xyz[0];
-            auto y = v[i].xyz[1];
-            auto z = v[i].xyz[2];
+            double x = v[i].xyz[0];
+            double y = v[i].xyz[1];
+            double z = v[i].xyz[2];
 
-            x = (double)mat[0][0] * (double)x + (double)mat[0][1] * (double)y + (double)mat[0][2] * (double)z + (double)mat[0][3];
-            y = (double)mat[1][0] * (double)x + (double)mat[1][1] * (double)y + (double)mat[1][2] * (double)z + (double)mat[1][3];
-            z = (double)mat[2][0] * (double)x + (double)mat[2][1] * (double)y + (double)mat[2][2] * (double)z + (double)mat[2][3];
+            double x1 = (double)mat[0][0] * (double)x + (double)mat[0][1] * (double)y + (double)mat[0][2] * (double)z + (double)mat[0][3];
+            double y1 = (double)mat[1][0] * (double)x + (double)mat[1][1] * (double)y + (double)mat[1][2] * (double)z + (double)mat[1][3];
+            double z1 = (double)mat[2][0] * (double)x + (double)mat[2][1] * (double)y + (double)mat[2][2] * (double)z + (double)mat[2][3];
 
-            auto x_in = x / z;
-            auto y_in = y / z;
+            f << std::fixed << x1 << " " << y1 << " " << z1 << std::endl;
 
-            auto x1 = ((x_in - ppx) / fx);
-            auto y1 = ((y_in - ppy) / fy);
-            auto r2 = (x1 * x1 + y1 * y1);
 
            
-            f1[i].x = x1;
-            f1[i].y = y1;
+            auto x_in = x1 / z1;
+            auto y_in = y1 / z1;
 
-            rc[i] = 1 + yuy_intrin.coeffs[0] * r2 + yuy_intrin.coeffs[1] * r2 * r2 + yuy_intrin.coeffs[4] * r2 * r2 * r2;
+            auto x2 = ((x_in - ppx) / fx);
+            auto y2 = ((y_in - ppy) / fy);
+
+            f1[i].first = x2;
+            f1[i].second = y2;
+
+            auto r2 = (x2 * x2 + y2 * y2);
+
+            rc[i] = 1 + (double)yuy_intrin.coeffs[0] * r2 + (double)yuy_intrin.coeffs[1] * r2 * r2 + (double)yuy_intrin.coeffs[4] * r2 * r2 * r2;
         }
 
         return { f1,rc };
     }
-    auto_cal_algo::translation auto_cal_algo::calculate_translation_y_coeff(rs2_vertex v, double rc, float2 xy, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin)
+    auto_cal_algo::translation auto_cal_algo::calculate_translation_y_coeff(rs2_vertex v, double rc, std::pair<double,double> xy, const calib& yuy_intrin_extrin)
     {
         auto_cal_algo::translation res;
 
-        auto x1 = (double)xy.x;
-        auto y1 = (double)xy.y;
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
 
         auto x2 = x1 * x1;
         auto y2 = y1 * y1;
         auto xy2 = x2 + y2;
         auto x2_y2 = xy2 * xy2;
 
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppy = (double)yuy_intrin.ppy;
-        auto fx = (double)yuy_intrin.fx;
-        auto fy = (double)yuy_intrin.fy;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
 
         auto x = (double)v.xyz[0];
         auto y = (double)v.xyz[1];
@@ -1319,24 +1334,25 @@ auto max_optimization_iters = 50;
         return res;
     }
 
-    auto_cal_algo::translation auto_cal_algo::calculate_translation_x_coeff(rs2_vertex v, double rc, float2 xy, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin)
+    auto_cal_algo::translation auto_cal_algo::calculate_translation_x_coeff(rs2_vertex v, double rc, std::pair<double,double> xy, const calib & yuy_intrin_extrin)
     {
         auto_cal_algo::translation res;
 
-        auto x1 = (double)xy.x;
-        auto y1 = (double)xy.y;
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
 
         auto x2 = x1 * x1;
         auto y2 = y1 * y1;
         auto xy2 = x2 + y2;
         auto x2_y2 = xy2 * xy2;
 
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppy = (double)yuy_intrin.ppy;
-        auto fx = (double)yuy_intrin.fx;
-        auto fy = (double)yuy_intrin.fy;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
 
         auto x = (double)v.xyz[0];
         auto y = (double)v.xyz[1];
@@ -1371,29 +1387,29 @@ auto max_optimization_iters = 50;
 
     }
 
-    auto_cal_algo::coeffs<auto_cal_algo::rotation_in_angles> auto_cal_algo::calc_rotation_coefs(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy)
+    auto_cal_algo::coeffs<auto_cal_algo::rotation_in_angles> auto_cal_algo::calc_rotation_coefs(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double,double>>& xy)
     {
         auto_cal_algo::coeffs<auto_cal_algo::rotation_in_angles> res;
-        auto engles = extract_angles_from_rotation(yuy_extrin.rotation);
+        auto engles = extract_angles_from_rotation(yuy_intrin_extrin.rot.rot);
         auto v = z_data.vertices;
         res.x_coeffs.resize(v.size());
         res.y_coeffs.resize(v.size());
 
         for (auto i = 0; i < v.size(); i++)
         {
-            res.x_coeffs[i].alpha = calculate_rotation_x_alpha_coeff(engles, v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
-            res.x_coeffs[i].beta = calculate_rotation_x_beta_coeff(engles, v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
-            res.x_coeffs[i].gamma = calculate_rotation_x_gamma_coeff(engles, v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
+            res.x_coeffs[i].alpha = calculate_rotation_x_alpha_coeff(engles, v[i], rc[i], xy[i], yuy_intrin_extrin);
+            res.x_coeffs[i].beta = calculate_rotation_x_beta_coeff(engles, v[i], rc[i], xy[i], yuy_intrin_extrin);
+            res.x_coeffs[i].gamma = calculate_rotation_x_gamma_coeff(engles, v[i], rc[i], xy[i], yuy_intrin_extrin);
 
-            res.y_coeffs[i].alpha = calculate_rotation_y_alpha_coeff(engles, v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
-            res.y_coeffs[i].beta = calculate_rotation_y_beta_coeff(engles, v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
-            res.y_coeffs[i].gamma = calculate_rotation_y_gamma_coeff(engles, v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
+            res.y_coeffs[i].alpha = calculate_rotation_y_alpha_coeff(engles, v[i], rc[i], xy[i], yuy_intrin_extrin);
+            res.y_coeffs[i].beta = calculate_rotation_y_beta_coeff(engles, v[i], rc[i], xy[i], yuy_intrin_extrin);
+            res.y_coeffs[i].gamma = calculate_rotation_y_gamma_coeff(engles, v[i], rc[i], xy[i], yuy_intrin_extrin);
         }
 
         return res;
     }
 
-    auto_cal_algo::coeffs<auto_cal_algo::k_matrix> auto_cal_algo::calc_k_gradients_coefs(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy)
+    auto_cal_algo::coeffs<auto_cal_algo::k_matrix> auto_cal_algo::calc_k_gradients_coefs(const z_frame_data & z_data, const yuy2_frame_data & yuy_data, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double,double>>& xy)
     {
         auto_cal_algo::coeffs<auto_cal_algo::k_matrix> res;
         auto v = z_data.vertices;
@@ -1402,26 +1418,27 @@ auto max_optimization_iters = 50;
 
         for (auto i = 0; i < v.size(); i++)
         {
-            res.x_coeffs[i] = calculate_k_gradients_x_coeff(v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
-            res.y_coeffs[i] = calculate_k_gradients_y_coeff(v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
+            res.x_coeffs[i] = calculate_k_gradients_x_coeff(v[i], rc[i], xy[i], yuy_intrin_extrin);
+            res.y_coeffs[i] = calculate_k_gradients_y_coeff(v[i], rc[i], xy[i], yuy_intrin_extrin);
         }
 
         return res;
     }
 
-    auto_cal_algo::k_matrix auto_cal_algo::calculate_k_gradients_y_coeff(rs2_vertex v, double rc, float2 xy, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin)
+    auto_cal_algo::k_matrix auto_cal_algo::calculate_k_gradients_y_coeff(rs2_vertex v, double rc, std::pair<double,double> xy, const calib & yuy_intrin_extrin)
     {
         auto_cal_algo::k_matrix res;
 
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppx = (double)yuy_intrin.ppx;
-        auto ppy = (double)yuy_intrin.ppy;
-        auto fx = (double)yuy_intrin.fx;
-        auto fy = (double)yuy_intrin.fy;
-        auto x1 = (double)xy.x;
-        auto y1 = (double)xy.y;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
+
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
         auto x = (double)v.xyz[0];
         auto y = (double)v.xyz[1];
         auto z = (double)v.xyz[2];
@@ -1450,19 +1467,20 @@ auto max_optimization_iters = 50;
         return res;
     }
 
-    auto_cal_algo::k_matrix auto_cal_algo::calculate_k_gradients_x_coeff(rs2_vertex v, double rc, float2 xy, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin)
+    auto_cal_algo::k_matrix auto_cal_algo::calculate_k_gradients_x_coeff(rs2_vertex v, double rc, std::pair<double,double> xy, const calib & yuy_intrin_extrin)
     {
         auto_cal_algo::k_matrix res;
 
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppx = (double)yuy_intrin.ppx;
-        auto ppy = (double)yuy_intrin.ppy;
-        auto fx = (double)yuy_intrin.fx;
-        auto fy = (double)yuy_intrin.fy;
-        auto x1 = (double)xy.x;
-        auto y1 = (double)xy.y;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
+
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
         auto x = (double)v.xyz[0];
         auto y = (double)v.xyz[1];
         auto z = (double)v.xyz[2];
@@ -1492,15 +1510,15 @@ auto max_optimization_iters = 50;
         return res;
     }
 
-    double auto_cal_algo::calculate_rotation_x_alpha_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin)
+    double auto_cal_algo::calculate_rotation_x_alpha_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib & yuy_intrin_extrin)
     {
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppx = (double)yuy_intrin.ppx;
-        auto ppy = (double)yuy_intrin.ppy;
-        auto fx = (double)yuy_intrin.fx;
-        auto fy = (double)yuy_intrin.fy;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
 
         auto sin_a = (double)sin(rot_angles.alpha);
         auto sin_b = (double)sin(rot_angles.beta);
@@ -1509,8 +1527,8 @@ auto max_optimization_iters = 50;
         auto cos_a = (double)cos(rot_angles.alpha);
         auto cos_b = (double)cos(rot_angles.beta);
         auto cos_g = (double)cos(rot_angles.gamma);
-        auto x1 = (double)xy.x;
-        auto y1 = (double)xy.y;
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
 
         auto x2 = x1 * x1;
         auto y2 = y1 * y1;
@@ -1591,15 +1609,15 @@ auto max_optimization_iters = 50;
         return res;
     }
 
-    double auto_cal_algo::calculate_rotation_x_beta_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin)
+    double auto_cal_algo::calculate_rotation_x_beta_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib & yuy_intrin_extrin)
     {
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppx = yuy_intrin.ppx;
-        auto ppy = yuy_intrin.ppy;
-        auto fx = yuy_intrin.fx;
-        auto fy = yuy_intrin.fy;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
 
         auto sin_a = sin(rot_angles.alpha);
         auto sin_b = sin(rot_angles.beta);
@@ -1608,8 +1626,8 @@ auto max_optimization_iters = 50;
         auto cos_a = cos(rot_angles.alpha);
         auto cos_b = cos(rot_angles.beta);
         auto cos_g = cos(rot_angles.gamma);
-        auto x1 = xy.x;
-        auto y1 = xy.y;
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
 
         auto x2 = x1 * x1;
         auto y2 = y1 * y1;
@@ -1676,15 +1694,15 @@ auto max_optimization_iters = 50;
         return res;
     }
 
-    double auto_cal_algo::calculate_rotation_x_gamma_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin)
+    double auto_cal_algo::calculate_rotation_x_gamma_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib & yuy_intrin_extrin)
     {
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppx = (double)yuy_intrin.ppx;
-        auto ppy = (double)yuy_intrin.ppy;
-        auto fx = (double)yuy_intrin.fx;
-        auto fy = (double)yuy_intrin.fy;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
 
         auto sin_a = (double)sin(rot_angles.alpha);
         auto sin_b = (double)sin(rot_angles.beta);
@@ -1693,8 +1711,8 @@ auto max_optimization_iters = 50;
         auto cos_a = (double)cos(rot_angles.alpha);
         auto cos_b = (double)cos(rot_angles.beta);
         auto cos_g = (double)cos(rot_angles.gamma);
-        auto x1 = (double)xy.x;
-        auto y1 = (double)xy.y;
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
 
         auto x2 = x1 * x1;
         auto y2 = y1 * y1;
@@ -1740,15 +1758,15 @@ auto max_optimization_iters = 50;
         return res;
     }
 
-    double auto_cal_algo::calculate_rotation_y_alpha_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin)
+    double auto_cal_algo::calculate_rotation_y_alpha_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib & yuy_intrin_extrin)
     {
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppx = (double)yuy_intrin.ppx;
-        auto ppy = (double)yuy_intrin.ppy;
-        auto fx = (double)yuy_intrin.fx;
-        auto fy = (double)yuy_intrin.fy;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
 
         auto sin_a = (double)sin(rot_angles.alpha);
         auto sin_b = (double)sin(rot_angles.beta);
@@ -1757,8 +1775,8 @@ auto max_optimization_iters = 50;
         auto cos_a = (double)cos(rot_angles.alpha);
         auto cos_b = (double)cos(rot_angles.beta);
         auto cos_g = (double)cos(rot_angles.gamma);
-        auto x1 = (double)xy.x;
-        auto y1 = (double)xy.y;
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
 
        /* x1 = 1;
         y1 = 1;*/
@@ -1793,15 +1811,15 @@ auto max_optimization_iters = 50;
         return res;
     }
 
-    double auto_cal_algo::calculate_rotation_y_beta_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin)
+    double auto_cal_algo::calculate_rotation_y_beta_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib & yuy_intrin_extrin)
     {
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppx = (double)yuy_intrin.ppx;
-        auto ppy = (double)yuy_intrin.ppy;
-        auto fx = (double)yuy_intrin.fx;
-        auto fy = (double)yuy_intrin.fy;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
 
         auto sin_a = (double)sin(rot_angles.alpha);
         auto sin_b = (double)sin(rot_angles.beta);
@@ -1810,8 +1828,8 @@ auto max_optimization_iters = 50;
         auto cos_a = (double)cos(rot_angles.alpha);
         auto cos_b = (double)cos(rot_angles.beta);
         auto cos_g = (double)cos(rot_angles.gamma);
-        auto x1 = (double)xy.x;
-        auto y1 = (double)xy.y;
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
 
         auto x2 = x1 * x1;
         auto y2 = y1 * y1;
@@ -1844,15 +1862,15 @@ auto max_optimization_iters = 50;
 
     }
 
-    double auto_cal_algo::calculate_rotation_y_gamma_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, float2 xy, const rs2_intrinsics & yuy_intrin, const rs2_extrinsics & yuy_extrin)
+    double auto_cal_algo::calculate_rotation_y_gamma_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double,double> xy, const calib & yuy_intrin_extrin)
     {
-        auto r = yuy_extrin.rotation;
-        auto t = yuy_extrin.translation;
-        auto d = yuy_intrin.coeffs;
-        auto ppx = (double)yuy_intrin.ppx;
-        auto ppy = (double)yuy_intrin.ppy;
-        auto fx = (double)yuy_intrin.fx;
-        auto fy = (double)yuy_intrin.fy;
+        auto r = yuy_intrin_extrin.rot.rot;
+        double t[3] = { yuy_intrin_extrin.trans.t1, yuy_intrin_extrin.trans.t2, yuy_intrin_extrin.trans.t3 };
+        auto d = yuy_intrin_extrin.coeffs;
+        auto ppx = (double)yuy_intrin_extrin.k_mat.ppx;
+        auto ppy = (double)yuy_intrin_extrin.k_mat.ppy;
+        auto fx = (double)yuy_intrin_extrin.k_mat.fx;
+        auto fy = (double)yuy_intrin_extrin.k_mat.fy;
 
         auto sin_a = (double)sin(rot_angles.alpha);
         auto sin_b = (double)sin(rot_angles.beta);
@@ -1861,8 +1879,8 @@ auto max_optimization_iters = 50;
         auto cos_a = (double)cos(rot_angles.alpha);
         auto cos_b = (double)cos(rot_angles.beta);
         auto cos_g = (double)cos(rot_angles.gamma);
-        auto x1 = (double)xy.x;
-        auto y1 = (double)xy.y;
+        auto x1 = (double)xy.first;
+        auto y1 = (double)xy.second;
 
         auto x2 = x1 * x1;
         auto y2 = y1 * y1;
@@ -1896,7 +1914,7 @@ auto max_optimization_iters = 50;
         return res;
     }
 
-    auto_cal_algo::coeffs<auto_cal_algo::translation> auto_cal_algo::calc_translation_coefs(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const rs2_intrinsics& yuy_intrin, const rs2_extrinsics& yuy_extrin, const std::vector<double>& rc, const std::vector<float2>& xy)
+    auto_cal_algo::coeffs<auto_cal_algo::translation> auto_cal_algo::calc_translation_coefs(const z_frame_data& z_data, const yuy2_frame_data& yuy_data, const calib & yuy_intrin_extrin, const std::vector<double>& rc, const std::vector<std::pair<double,double>>& xy)
     {
         auto_cal_algo::coeffs<auto_cal_algo::translation> res;
 
@@ -1906,8 +1924,8 @@ auto max_optimization_iters = 50;
 
         for (auto i = 0; i < rc.size(); i++)
         {
-            res.y_coeffs[i] = calculate_translation_y_coeff(v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
-            res.x_coeffs[i] = calculate_translation_x_coeff(v[i], rc[i], xy[i], yuy_intrin, yuy_extrin);
+            res.y_coeffs[i] = calculate_translation_y_coeff(v[i], rc[i], xy[i], yuy_intrin_extrin);
+            res.x_coeffs[i] = calculate_translation_x_coeff(v[i], rc[i], xy[i], yuy_intrin_extrin);
 
         }
        
@@ -1998,6 +2016,7 @@ auto max_optimization_iters = 50;
         std::cout << "Optimaized cost = " << params_curr.cost << std::endl;
 
         return optimized;
+       
         return 0;
     }
 
