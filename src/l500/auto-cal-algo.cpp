@@ -63,12 +63,12 @@ namespace librealsense
         auto yuy_data = preprocess_yuy2_data(yuy, prev_yuy);
         std::ofstream f;
         f.open("yuy_data", std::ios::binary);
-        f.write((char*)yuy_data.yuy2_frame.data(), yuy_data.yuy2_frame.size());
-          auto ir_data = preprocess_ir(ir);
+        f.write((char*)yuy_data.yuy2_orig_frame.data(), yuy_data.yuy2_orig_frame.size());
+        auto ir_data = preprocess_ir(ir);
         std::ofstream f1;
         f1.open("ir_data", std::ios::binary);
         f1.write((char*)ir_data.ir_frame.data(), ir_data.ir_frame.size());
-          auto depth_units = depth.as<rs2::depth_frame>().get_units();
+        auto depth_units = depth.as<rs2::depth_frame>().get_units();
         auto vf = depth.get_profile().as<rs2::video_stream_profile>();
 
         auto z_data = preproccess_z(depth, ir_data, vf.get_intrinsics(), depth_units);
@@ -185,6 +185,7 @@ namespace librealsense
         auto vf = color.get_profile().as<rs2::video_stream_profile>();
         std::vector<uint16_t> color_frame(color.get_data_size(), 0);
         std::copy((uint16_t*)(color.get_data()), (uint16_t*)(color.get_data()) +vf.width()*vf.height(), color_frame.begin());
+        res.yuy2_orig_frame = color_frame;
 
         res.yuy2_frame = get_luminance_from_yuy2(color_frame);
         

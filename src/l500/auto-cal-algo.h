@@ -52,6 +52,7 @@ namespace librealsense
 
         struct yuy2_frame_data
         {
+            std::vector<uint16_t> yuy2_orig_frame;
             std::vector<uint8_t> yuy2_frame;
             std::vector<uint8_t> yuy2_prev_frame;
             std::vector<double> edges;
