@@ -69,6 +69,10 @@ public:
         std::vector<double> weights;
         std::vector<double> direction_deg;
         std::vector<rs2_vertex> vertices;
+        std::vector<unsigned char> section_map_depth;
+        bool is_edge_distributed;
+        std::vector<double>sum_weights_per_section;
+        double min_max_ratio;
     };
 
     struct yuy2_frame_data
@@ -79,7 +83,12 @@ public:
         std::vector<double> edges_IDT;
         std::vector<double> edges_IDTx;
         std::vector<double> edges_IDTy;
+        std::vector<unsigned char> section_map_yuy;
+        bool is_edge_distributed;
+        std::vector<double>sum_weights_per_section;
+        double min_max_ratio;
     };
+
 
     struct translation
     {
@@ -169,6 +178,7 @@ public:
         double num_of_sections_for_edge_distribution_x = 2;
         double num_of_sections_for_edge_distribution_y = 2;
         calib normelize_mat;
+        double edge_distribut_min_max_ratio = 1;
     };
 
     struct
@@ -178,7 +188,7 @@ public:
                                                              {deg_135, {-1, 1}} };
 
 
-    bool optimaize();
+    bool optimaize();// (unsigned char* section_map_rgb, unsigned char* section_map_depth);
 
     std::vector<uint8_t> create_syntetic_y(int width, int height)
     {
@@ -278,9 +288,11 @@ private:
     double calculate_rotation_y_gamma_coeff(rotation_in_angles rot_angles, rs2_vertex v, double rc, std::pair<double, double> xy, const calib& yuy_intrin_extrin);
     void deproject_sub_pixel(std::vector<rs2_vertex>& points, const rs2_intrinsics & intrin, const double * x, const double * y, const uint16_t * depth, double depth_units);
 
+    // NOHA :: new
+    void isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy_data);
+    void sectionPerPixel(bool is_rgb, int section_x, int section_y, unsigned char* section_map);
     params _params;
 };
-
 
 std::vector<double> calc_intensity(std::vector<double> image1, std::vector<double> image2)
 {
@@ -826,6 +838,11 @@ auto_cal_algo::yuy2_frame_data auto_cal_algo::preprocess_yuy2_data(const rs2_int
 
     res.edges = calc_edges(res.yuy2_frame, rgb_intrinsics.width, rgb_intrinsics.height);
     res.edges_IDT = blure_edges(res.edges, rgb_intrinsics.width, rgb_intrinsics.height);
+
+    // NOHA : add section map code here
+
+
+
     //auto YUY2_IDT = get_image<double>("C:/work/librealsense/build/wrappers/opencv/imshow/3 - Copy/binFiles/YUY2_IDT_1080x1920_single_00.bin", 1920, 1080);
    
     //std::ofstream f;
@@ -2081,7 +2098,7 @@ std::pair<auto_cal_algo::calib, double> auto_cal_algo::calc_cost_and_grad(const 
     return { grad, cost };
 }
 
-bool auto_cal_algo::optimaize()
+bool auto_cal_algo::optimaize()//(unsigned char* section_map_rgb, unsigned char* section_map_depth)
 {
     rs2_intrinsics depth_intrin = { width_z, height_z,
       561.812500000000, 397.027343750000,
@@ -2106,11 +2123,43 @@ bool auto_cal_algo::optimaize()
 
 
    
-
+    /*for (auto i = 0; i < z_data.supressed_edges.size(); i++)
+    {
+        if (z_data.supressed_edges[i])
+            z_data.weights.push_back(
+                get_min(get_max(z_data.supressed_edges[i] - _params.grad_z_min, (double)0),
+                    _params.grad_z_max - _params.grad_z_min));
+    }*/
     auto yuy_data = preprocess_yuy2_data(rgb_intrinsics);
 
 
-   
+   // NOHA :: add section_map code here
+    std::allocator<byte> alloc;
+    byte* section_map_depth = (byte*)alloc.allocate(width_z * height_z);
+    byte* section_map_rgb = (byte*)alloc.allocate(width_yuy2 * height_yuy2);
+    sectionPerPixel(0, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_depth);
+    sectionPerPixel(1, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_rgb);
+    // remove pixels in section map that were removed in weigts
+    for (auto i = 0; i < z_data.supressed_edges.size(); i++)
+    {
+        if (z_data.supressed_edges[i])
+        {
+            z_data.section_map_depth.push_back(*(section_map_depth + i));
+        }
+    }
+    // remove pixels in section map where edges_IDT > 0
+    int i = 0;
+    for (auto it = yuy_data.edges_IDT.begin(); it != yuy_data.edges_IDT.end(); ++it,++i)
+    {
+        if (*it > 0)
+        {
+            yuy_data.section_map_yuy.push_back(*(section_map_rgb+i));
+        }
+    }
+    //call is_edge_distributed
+    isEdgeDistributed(z_data, yuy_data);
+    /// NOHA :: end of my code
+
 
     //std::sort(z_data.edges.begin(), z_data.edges.end());
 
@@ -2167,32 +2216,86 @@ bool auto_cal_algo::optimaize()
 }
 // NOHA :: my code starts here
 enum frame_t { YUY, DEPTH, IR };
-bool isEdgeDistributed(std::vector<double> yuy_weights,byte* section_map, int section_x, int section_y)
+//bool isEdgeDistributed(std::vector<double> yuy_weights,byte* section_map, int section_x, int section_y)
+void auto_cal_algo::isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy_data)
 {
-    /*sumWeightsPerSection = zeros(params.numSectionsV*params.numSectionsH,1);
-for ix = 1:params.numSectionsV*params.numSectionsH
-    sumWeightsPerSection(ix) = sum(weights(sectionMap == ix-1));
-end*/
-    std::allocator<byte> alloc;
-    double* sumWeightsPerSection = (double*)alloc.allocate(section_x * section_y);
-    for (auto i = 0; i < section_x * section_y; i++)
+    z_data.is_edge_distributed = true;
+    yuy_data.is_edge_distributed = true;
+
+    // depth frame
+    auto sum_per_section_iter = z_data.sum_weights_per_section.begin();
+    for (auto i = 0; i < _params.num_of_sections_for_edge_distribution_x * _params.num_of_sections_for_edge_distribution_y; i++)
     {
-        *(sumWeightsPerSection + i) = 0;
-        for (auto ii = 0; ii < width_z * height_z; ii++)
+        *(sum_per_section_iter + i) = 0;
+        auto section_depth_iter = z_data.section_map_depth.begin();
+        auto weights_depth_iter = z_data.weights.begin();
+        for (auto ii = 0; ii < z_data.section_map_depth.size(); ++ii)
         {
-            if (*(section_map + ii)==i)
+            if (*(section_depth_iter + ii) == i)
             {
-                *(sumWeightsPerSection + i) += yuy_weights[ii];
+                *(sum_per_section_iter + i) += *(weights_depth_iter + ii);
             }
         }
     }
-    return true;
+    double z_max = *(std::max_element(z_data.sum_weights_per_section.begin(), z_data.sum_weights_per_section.end()));
+    double z_min = *(std::min_element(z_data.sum_weights_per_section.begin(), z_data.sum_weights_per_section.end()));
+    z_data.min_max_ratio = z_min / z_max;
+    if (z_data.min_max_ratio < _params.edge_distribut_min_max_ratio)
+    {
+        z_data.is_edge_distributed = false;
+    }
+    for (auto it = z_data.sum_weights_per_section.begin(); it != z_data.sum_weights_per_section.end(); ++it)
+    {
+        if (*it < _params.min_weighted_edge_per_section_depth)
+        {
+            z_data.is_edge_distributed = false;
+        }
+    }
+
+    // yuy frame
+    auto yuy_sum_per_section_iter = yuy_data.sum_weights_per_section.begin();
+    for (auto i = 0; i < _params.num_of_sections_for_edge_distribution_x * _params.num_of_sections_for_edge_distribution_y; i++)
+    {
+        *(yuy_sum_per_section_iter + i) = 0;
+        for (auto it = yuy_data.edges_IDT.begin(); it != yuy_data.edges_IDT.end(); ++it, ++i)
+        {
+            auto section_yuy_iter = yuy_data.section_map_yuy.begin();
+            auto edges_yuy_iter = yuy_data.edges_IDT.begin();
+            auto jj = 0;
+            for (auto ii = 0; ii < yuy_data.section_map_yuy.size(); ++ii, ++jj)
+            {
+                if (*(edges_yuy_iter + jj) == 0) // section map is filtered when edges_IDT>0
+                {
+                    ii--;
+                    continue;
+                }
+                if (*(section_yuy_iter + ii) == i)
+                {
+                    *(yuy_sum_per_section_iter + i) += *(edges_yuy_iter + jj);
+                }
+            }
+        }
+
+        double yuy_max = *(std::max_element(yuy_data.sum_weights_per_section.begin(), yuy_data.sum_weights_per_section.end()));
+        double yuy_min = *(std::min_element(yuy_data.sum_weights_per_section.begin(), yuy_data.sum_weights_per_section.end()));
+        yuy_data.min_max_ratio = yuy_min / yuy_max;
+        if (yuy_data.min_max_ratio < _params.edge_distribut_min_max_ratio)
+        {
+            yuy_data.is_edge_distributed = false;
+        }
+        for (auto it = yuy_data.sum_weights_per_section.begin(); it != yuy_data.sum_weights_per_section.end(); ++it)
+        {
+            if (*it < _params.min_weighted_edge_per_section_depth)
+            {
+                yuy_data.is_edge_distributed = false;
+            }
+        }
+    }
 }
-void sectionPerPixel(bool is_rgb, int section_x, int section_y, byte* section_map)
+void auto_cal_algo::sectionPerPixel(bool is_rgb, int section_x, int section_y, unsigned char* section_map)
 {
     std::allocator<byte> alloc;
-    byte* gridX = (byte*)alloc.allocate(width_z * height_z);
-    byte* gridY = (byte*)alloc.allocate(width_z * height_z);
+    
     auto x = width_z;
     auto y = height_z;
 
@@ -2200,6 +2303,8 @@ void sectionPerPixel(bool is_rgb, int section_x, int section_y, byte* section_ma
         x = width_yuy2;
         y = height_yuy2;
     }
+    unsigned char* gridX = (unsigned char*)alloc.allocate(x * y);
+    unsigned char* gridY = (unsigned char*)alloc.allocate(x * y);
     // res(2) is x
     // res(1) is y
     for (auto i = 0; i < y; i++)
@@ -2208,32 +2313,33 @@ void sectionPerPixel(bool is_rgb, int section_x, int section_y, byte* section_ma
 
             *(gridX + i * y + j) = (j * section_x / x);
             *(gridY + i * y + j) = (i * section_y / y);
-            *(section_map + i * y + j) = (i * section_y / y) + (j * section_x / x) * section_y;
+            *(section_map + i * y + j) = (unsigned char)((i * section_y / y) + (j * section_x / x) * section_y);
         }
     }
-    return;
 }
 bool auto_cal_algo::is_scene_valid(yuy2_frame_data& yuy, z_frame_data& depth)
 {
     std::allocator<byte> alloc;
-    byte * section_map_depth = (byte*)alloc.allocate(width_z * height_z);
-    byte* section_map_rgb = (byte*)alloc.allocate(width_z * height_z);
+    //byte * section_map_depth = (byte*)alloc.allocate(width_z * height_z);
+    //byte* section_map_rgb = (byte*)alloc.allocate(width_yuy2 * height_yuy2);
 
-    sectionPerPixel(0, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_depth);
-    sectionPerPixel(0, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_rgb);
-    std::vector<double> depth_weights = calculate_weights(depth);
+    //sectionPerPixel(0, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_depth);
+    //sectionPerPixel(1, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_rgb);
+    //std::vector<double> depth_weights = calculate_weights(depth);
     //std::vector<double> yuy_weights = calculate_weights(yuy);
     //bool rgb_edge_distributed = isEdgeDistributed(depth, section_map_rgb, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y);
-    bool depth_edge_distributed = isEdgeDistributed(depth_weights, section_map_depth, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y);
+    //bool depth_edge_distributed = isEdgeDistributed(depth_weights, section_map_depth, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y);
     return true;
 }
 
 int main()
 {
     auto_cal_algo auto_cal;
-    
-    auto_cal.optimaize();
-    
+    //std::allocator<byte> alloc;
+    //byte* section_map_depth = (byte*)alloc.allocate(width_z * height_z);
+    //byte* section_map_rgb = (byte*)alloc.allocate(width_yuy2 * height_yuy2);
+    auto_cal.optimaize();// (section_map_rgb, section_map_depth);
+   
     
 
     std::cout << "Hello World!\n";
