@@ -289,8 +289,9 @@ private:
     void deproject_sub_pixel(std::vector<rs2_vertex>& points, const rs2_intrinsics & intrin, const double * x, const double * y, const uint16_t * depth, double depth_units);
 
     // NOHA :: new
-    bool isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy_data);
+    bool is_edge_distributed(z_frame_data& z_data, yuy2_frame_data& yuy_data);
     void sectionPerPixel(bool is_rgb, int section_x, int section_y, unsigned char* section_map);
+    bool is_grad_dir_balanced(z_frame_data& z_data, yuy2_frame_data& yuy_data);
     params _params;
 };
 
@@ -2197,6 +2198,7 @@ enum frame_t { YUY, DEPTH, IR };
 //bool isEdgeDistributed(std::vector<double> yuy_weights,byte* section_map, int section_x, int section_y)
 void sum_per_section(std::vector<double>& sum_weights_per_section, std::vector<unsigned char> &section_map, std::vector<double>& weights, double num_of_sections)
 {
+    sum_weights_per_section.reserve(num_of_sections);
     auto sum_per_section_iter = sum_weights_per_section.begin(); // NOHA :: TODO :: check sum_weights_per_section allocation
     for (auto i = 0; i < num_of_sections; i++)
     {
@@ -2233,7 +2235,7 @@ bool check_edge_distribution(std::vector<double>& sum_weights_per_section, doubl
     }
     return true;
 }
-bool auto_cal_algo::isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy_data)
+bool auto_cal_algo::is_edge_distributed(z_frame_data& z_data, yuy2_frame_data& yuy_data)
 {
     z_data.is_edge_distributed = true;
     yuy_data.is_edge_distributed = true;
@@ -2349,25 +2351,77 @@ void auto_cal_algo::sectionPerPixel(bool is_rgb, int section_x, int section_y, u
         }
     }
 }
+bool auto_cal_algo::is_grad_dir_balanced(z_frame_data& z_data, yuy2_frame_data& yuy_data)
+{
+    /*function [isBalanced,dirRatio1,perpRatio,dirRatio2,weightsPerDir] = isGradDirBalanced(frame,params)
+isBalanced = false;
+dirRatio2 = nan;
+perpRatio = nan;
+iWeights = frame.zEdgeSupressed>0;
+weightIm = frame.zEdgeSupressed;
+weightIm(iWeights) = frame.weights;
+weightsPerDir = [sum(weightIm(frame.dirI == 1));sum(weightIm(frame.dirI == 2));sum(weightIm(frame.dirI == 3));sum(weightIm(frame.dirI == 4))];
+[maxVal,maxIx] = max(weightsPerDir);
+ixMatch = mod(maxIx+2,4);
+if ixMatch == 0
+    ixMatch = 4;
+end
+if weightsPerDir(ixMatch) < 1e-3 %Don't devide by zero...
+    dirRatio1 = 1e6;
+else
+    dirRatio1 = maxVal/weightsPerDir(ixMatch);
+end
+if dirRatio1 > params.gradDirRatio
+    ixCheck = true(size(weightsPerDir));
+    ixCheck([maxIx,ixMatch]) = false;
+    [maxValPerp,~] = max(weightsPerDir(ixCheck));
+    perpRatio = maxVal/maxValPerp;
+    if perpRatio > params.gradDirRatioPerp
+        fprintf('isGradDirBalanced: gradient direction is not balanced: %0.5f, threshold is %0.5f\n',dirRatio1, params.gradDirRatio );
+        return;
+    end
+    if min(weightsPerDir(ixCheck)) < 1e-3 %Don't devide by zero...
+        fprintf('isGradDirBalanced: gradient direction is not balanced: %0.5f, threshold is %0.5f\n',dirRatio1, params.gradDirRatio );
+        dirRatio2 = nan;
+        return;
+    end
+    dirRatio2 = maxValPerp/min(weightsPerDir(ixCheck));
+    if dirRatio2 > params.gradDirRatio
+        fprintf('isGradDirBalanced: gradient direction is not balanced: %0.5f, threshold is %0.5f\n',dirRatio1, params.gradDirRatio );
+        return;
+    end
+end
+isBalanced = true;*/
+}
 bool auto_cal_algo::is_scene_valid(yuy2_frame_data& yuy_data, z_frame_data& z_data)
 {
     // NOHA :: TODO :: variable/functions name convention
     // NOHA :: add section_map code here
+    bool res_edges = true;
+    bool res_gradient = true;
+
     std::allocator<byte> alloc;
     byte* section_map_depth = (byte*)alloc.allocate(width_z * height_z);
     byte* section_map_rgb = (byte*)alloc.allocate(width_yuy2 * height_yuy2);
     sectionPerPixel(false, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_depth);
     sectionPerPixel(true, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_rgb);
     // remove pixels in section map that were removed in weigts
+    z_data.section_map.reserve(z_data.weights.size());
+    yuy_data.section_map.reserve(yuy_data.edges_IDT.size());
     for (auto i = 0; i < z_data.supressed_edges.size(); i++)
     {
         if (z_data.supressed_edges[i])
         {
-            z_data.section_map_depth.push_back(*(section_map_depth + i));
+            z_data.section_map.push_back(*(section_map_depth + i));
         }
         // NOHA :: TODO :: 
         // 1. throw exception when section map depth is wrong
         // 2. allocate section vector using reserve() - size = z_data.weights (keep push_back)
+    }
+    if (z_data.section_map.size() != z_data.weights.size())
+    {
+        std::cout << "ERROR :: depth section map size is %ld " << z_data.section_map.size() << " - should be same as weights size: %ld " << z_data.weights.size() << std::endl;
+        return false;
     }
     // remove pixels in section map where edges_IDT > 0
     int i = 0;
@@ -2375,12 +2429,19 @@ bool auto_cal_algo::is_scene_valid(yuy2_frame_data& yuy_data, z_frame_data& z_da
     {
         if (*it > 0)
         {
-            yuy_data.section_map_yuy.push_back(*(section_map_rgb + i));
+            yuy_data.section_map.push_back(*(section_map_rgb + i));
         }
     }
+    if (yuy_data.section_map.size() != yuy_data.edges_IDT.size())
+    {
+        std::cout << "ERROR :: yuy section map size is %ld " << yuy_data.section_map.size() << " - should be same as edges_IDT size: %ld " << yuy_data.edges_IDT.size() << std::endl;
+        return false;
+    }
     //call is_edge_distributed
-    bool res = isEdgeDistributed(z_data, yuy_data);
-    return true;
+    res_edges = is_edge_distributed(z_data, yuy_data);
+    res_gradient = is_grad_dir_balanced(z_data, yuy_data);
+
+    return (res_edges&& res_gradient);
 }
 
 int main()
