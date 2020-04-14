@@ -178,7 +178,7 @@ public:
         double num_of_sections_for_edge_distribution_x = 2;
         double num_of_sections_for_edge_distribution_y = 2;
         calib normelize_mat;
-        double edge_distribut_min_max_ratio = 1;
+        double edge_distribution_min_max_ratio = 1;
     };
 
     struct
@@ -289,7 +289,7 @@ private:
     void deproject_sub_pixel(std::vector<rs2_vertex>& points, const rs2_intrinsics & intrin, const double * x, const double * y, const uint16_t * depth, double depth_units);
 
     // NOHA :: new
-    void isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy_data);
+    bool isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy_data);
     void sectionPerPixel(bool is_rgb, int section_x, int section_y, unsigned char* section_map);
     params _params;
 };
@@ -2133,32 +2133,11 @@ bool auto_cal_algo::optimaize()//(unsigned char* section_map_rgb, unsigned char*
     auto yuy_data = preprocess_yuy2_data(rgb_intrinsics);
 
 
-   // NOHA :: add section_map code here
-    std::allocator<byte> alloc;
-    byte* section_map_depth = (byte*)alloc.allocate(width_z * height_z);
-    byte* section_map_rgb = (byte*)alloc.allocate(width_yuy2 * height_yuy2);
-    sectionPerPixel(0, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_depth);
-    sectionPerPixel(1, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_rgb);
-    // remove pixels in section map that were removed in weigts
-    for (auto i = 0; i < z_data.supressed_edges.size(); i++)
-    {
-        if (z_data.supressed_edges[i])
-        {
-            z_data.section_map_depth.push_back(*(section_map_depth + i));
-        }
-    }
-    // remove pixels in section map where edges_IDT > 0
-    int i = 0;
-    for (auto it = yuy_data.edges_IDT.begin(); it != yuy_data.edges_IDT.end(); ++it,++i)
-    {
-        if (*it > 0)
-        {
-            yuy_data.section_map_yuy.push_back(*(section_map_rgb+i));
-        }
-    }
-    //call is_edge_distributed
-    isEdgeDistributed(z_data, yuy_data);
-    /// NOHA :: end of my code
+  
+
+    // NOHA :: check scene validity
+    is_scene_valid(yuy_data, z_data);
+    
 
 
     //std::sort(z_data.edges.begin(), z_data.edges.end());
@@ -2208,22 +2187,23 @@ bool auto_cal_algo::optimaize()//(unsigned char* section_map_rgb, unsigned char*
     std::cout << "Optimaized cost = " << params_curr.cost << std::endl;
 
 
-    // NOHA :: check scene validity
-    is_scene_valid(yuy_data, z_data);
     return optimized;
 
     return 0;
 }
+
 // NOHA :: my code starts here
 enum frame_t { YUY, DEPTH, IR };
 //bool isEdgeDistributed(std::vector<double> yuy_weights,byte* section_map, int section_x, int section_y)
-void auto_cal_algo::isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy_data)
+bool auto_cal_algo::isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy_data)
 {
     z_data.is_edge_distributed = true;
     yuy_data.is_edge_distributed = true;
 
+    bool res = true;
     // depth frame
-    auto sum_per_section_iter = z_data.sum_weights_per_section.begin();
+    // NOHA :: TODO :: create 1 func for calc sum_per_section for both depth and yuy
+    auto sum_per_section_iter = z_data.sum_weights_per_section.begin(); // NOHA :: TODO :: check sum_weights_per_section allocation
     for (auto i = 0; i < _params.num_of_sections_for_edge_distribution_x * _params.num_of_sections_for_edge_distribution_y; i++)
     {
         *(sum_per_section_iter + i) = 0;
@@ -2237,23 +2217,26 @@ void auto_cal_algo::isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy
             }
         }
     }
+    // NOHA :: TODO :: add prints from Matlab
     double z_max = *(std::max_element(z_data.sum_weights_per_section.begin(), z_data.sum_weights_per_section.end()));
     double z_min = *(std::min_element(z_data.sum_weights_per_section.begin(), z_data.sum_weights_per_section.end()));
     z_data.min_max_ratio = z_min / z_max;
-    if (z_data.min_max_ratio < _params.edge_distribut_min_max_ratio)
+    if (z_data.min_max_ratio < _params.edge_distribution_min_max_ratio)
     {
-        z_data.is_edge_distributed = false;
+        z_data.is_edge_distributed = false; // NOHA :: TODO :: return here
+        res = false;
     }
     for (auto it = z_data.sum_weights_per_section.begin(); it != z_data.sum_weights_per_section.end(); ++it)
     {
         if (*it < _params.min_weighted_edge_per_section_depth)
         {
             z_data.is_edge_distributed = false;
+            res = false;
         }
     }
 
     // yuy frame
-    auto yuy_sum_per_section_iter = yuy_data.sum_weights_per_section.begin();
+    auto yuy_sum_per_section_iter = yuy_data.sum_weights_per_section.begin(); // NOHA :: TODO :: check sum_weights_per_section allocation
     for (auto i = 0; i < _params.num_of_sections_for_edge_distribution_x * _params.num_of_sections_for_edge_distribution_y; i++)
     {
         *(yuy_sum_per_section_iter + i) = 0;
@@ -2279,19 +2262,23 @@ void auto_cal_algo::isEdgeDistributed(z_frame_data& z_data, yuy2_frame_data& yuy
         double yuy_max = *(std::max_element(yuy_data.sum_weights_per_section.begin(), yuy_data.sum_weights_per_section.end()));
         double yuy_min = *(std::min_element(yuy_data.sum_weights_per_section.begin(), yuy_data.sum_weights_per_section.end()));
         yuy_data.min_max_ratio = yuy_min / yuy_max;
-        if (yuy_data.min_max_ratio < _params.edge_distribut_min_max_ratio)
+        if (yuy_data.min_max_ratio < _params.edge_distribution_min_max_ratio)
         {
             yuy_data.is_edge_distributed = false;
+            res = false;
         }
         for (auto it = yuy_data.sum_weights_per_section.begin(); it != yuy_data.sum_weights_per_section.end(); ++it)
         {
             if (*it < _params.min_weighted_edge_per_section_depth)
             {
                 yuy_data.is_edge_distributed = false;
+                res = false;
             }
         }
     }
+    return res;
 }
+
 void auto_cal_algo::sectionPerPixel(bool is_rgb, int section_x, int section_y, unsigned char* section_map)
 {
     std::allocator<byte> alloc;
@@ -2317,18 +2304,37 @@ void auto_cal_algo::sectionPerPixel(bool is_rgb, int section_x, int section_y, u
         }
     }
 }
-bool auto_cal_algo::is_scene_valid(yuy2_frame_data& yuy, z_frame_data& depth)
+bool auto_cal_algo::is_scene_valid(yuy2_frame_data& yuy_data, z_frame_data& z_data)
 {
+    // NOHA :: TODO :: variable/functions name convention
+    // NOHA :: add section_map code here
     std::allocator<byte> alloc;
-    //byte * section_map_depth = (byte*)alloc.allocate(width_z * height_z);
-    //byte* section_map_rgb = (byte*)alloc.allocate(width_yuy2 * height_yuy2);
-
-    //sectionPerPixel(0, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_depth);
-    //sectionPerPixel(1, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_rgb);
-    //std::vector<double> depth_weights = calculate_weights(depth);
-    //std::vector<double> yuy_weights = calculate_weights(yuy);
-    //bool rgb_edge_distributed = isEdgeDistributed(depth, section_map_rgb, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y);
-    //bool depth_edge_distributed = isEdgeDistributed(depth_weights, section_map_depth, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y);
+    byte* section_map_depth = (byte*)alloc.allocate(width_z * height_z);
+    byte* section_map_rgb = (byte*)alloc.allocate(width_yuy2 * height_yuy2);
+    sectionPerPixel(false, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_depth);
+    sectionPerPixel(true, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_rgb);
+    // remove pixels in section map that were removed in weigts
+    for (auto i = 0; i < z_data.supressed_edges.size(); i++)
+    {
+        if (z_data.supressed_edges[i])
+        {
+            z_data.section_map_depth.push_back(*(section_map_depth + i));
+        }
+        // NOHA :: TODO :: 
+        // 1. throw exception when section map depth is wrong
+        // 2. allocate section vector using reserve() - size = z_data.weights (keep push_back)
+    }
+    // remove pixels in section map where edges_IDT > 0
+    int i = 0;
+    for (auto it = yuy_data.edges_IDT.begin(); it != yuy_data.edges_IDT.end(); ++it, ++i)
+    {
+        if (*it > 0)
+        {
+            yuy_data.section_map_yuy.push_back(*(section_map_rgb + i));
+        }
+    }
+    //call is_edge_distributed
+    bool res = isEdgeDistributed(z_data, yuy_data);
     return true;
 }
 
