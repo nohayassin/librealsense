@@ -34,21 +34,11 @@ class auto_cal_algo
 {
 public:
 
-    /* std::string z_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/Z_GrayScale_1024x768_00.00.28.0628_F9440687_0001.raw";
-     std::string i_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/I_GrayScale_1024x768_00.00.28.0628_F9440687_0001.raw";
-     std::string yuy2_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/YUY2_YUY2_1920x1080_00.00.27.9425_F9440687_0000.raw";
-     std::string yuy2_prev_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/7/YUY2_YUY2_1920x1080_00.00.27.9425_F9440687_0000.raw";*/
 
-     //std::string z_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/2/Z_GrayScale_1024x768_00.00.26.7119_F9440687_0000.raw";//"LongRange/13/Z_GrayScale_1024x768_00.01.21.3573_F9440687_0001.raw";
-     //std::string i_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/2/I_GrayScale_1024x768_00.00.26.7119_F9440687_0000.raw";//"LongRange/13/I_GrayScale_1024x768_00.01.21.3573_F9440687_0000.raw";
-     //std::string yuy2_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/2/YUY2_YUY2_1920x1080_00.00.26.6355_F9440687_0000.raw";
-     //std::string yuy2_prev_file = "X:/IVCAM2_calibration _testing/19.2.20/F9440687/Snapshots/LongRange 768X1024 (RGB 1920X1080)/2/YUY2_YUY2_1920x1080_00.00.26.6355_F9440687_0000.raw";
-
-    std::string z_file = "C:/work/librealsense/build/wrappers/opencv/imshow/3 - Copy/Z.raw";//"LongRange/13/Z_GrayScale_1024x768_00.01.21.3573_F9440687_0001.raw";
-    std::string i_file = "C:/work/librealsense/build/wrappers/opencv/imshow/3 - Copy/I.raw";//"LongRange/13/I_GrayScale_1024x768_00.01.21.3573_F9440687_0000.raw";
-    std::string yuy2_file = "C:/work/librealsense/build/wrappers/opencv/imshow/3 - Copy/YUY2.raw";
-    std::string yuy2_prev_file = "C:/work/librealsense/build/wrappers/opencv/imshow/3 - Copy/YUY2.raw";
-
+    std::string z_file = "C:/Users/nyassin/Documents/auto_calibration/2/Z_GrayScale_1024x768_00.00.26.7119_F9440687_0000.raw";
+    std::string i_file = "C:/Users/nyassin/Documents/auto_calibration/2/I_GrayScale_1024x768_00.00.26.7119_F9440687_0000.raw";
+    std::string yuy2_file = "C:/Users/nyassin/Documents/auto_calibration/2/YUY2_YUY2_1920x1080_00.00.26.6355_F9440687_0000.raw";
+    std::string yuy2_prev_file = "C:/Users/nyassin/Documents/auto_calibration/2/YUY2_YUY2_1920x1080_00.00.26.6355_F9440687_0000.raw";
 
     enum direction :uint8_t
     {
@@ -260,7 +250,7 @@ private:
 
     std::vector<uint8_t> get_logic_edges(std::vector<double> edges);
     bool is_movement_in_images(const yuy2_frame_data & yuy);
-    bool is_scene_valid(yuy2_frame_data yuy);
+    bool is_scene_valid(yuy2_frame_data& yuy, z_frame_data& depth);
     std::vector<double> calculate_weights(z_frame_data& z_data);
     std::vector <rs2_vertex> subedges2vertices(z_frame_data& z_data, const rs2_intrinsics& intrin, double depth_units);
     optimaization_params back_tracking_line_search(const z_frame_data & z_data, const yuy2_frame_data& yuy_data, optimaization_params opt_params);
@@ -380,6 +370,7 @@ std::vector<double> calc_edges(std::vector<T> image, uint32_t image_widht, uint3
 //// Copyright(c) 2020 Intel Corporation. All Rights Reserved.
 
 #include "../include/librealsense2/rsutil.h"
+#include <types.h>
 
 auto_cal_algo::rotation_in_angles extract_angles_from_rotation(const double rotation[9])
 {
@@ -723,6 +714,9 @@ auto_cal_algo::z_frame_data auto_cal_algo::preproccess_z(const ir_frame_data& ir
 
 
     res.supressed_edges = supressed_edges(res, ir_data, width_z, height_z);
+    // NOHA :: section map 
+    // yuy.IDT is the weights
+
     /*std::ofstream f;
     f.open("supressed_edges");
     f.precision(15);
@@ -912,10 +906,6 @@ bool auto_cal_algo::is_movement_in_images(const yuy2_frame_data& yuy)
     return true;
 }
 
-bool auto_cal_algo::is_scene_valid(yuy2_frame_data yuy)
-{
-    return true;
-}
 
 double get_max(double x, double y)
 {
@@ -2102,7 +2092,7 @@ bool auto_cal_algo::optimaize()
 
     auto ir_data = preprocess_ir();
     std::ifstream ifs;
-    ifs.open(" C:/work/librealsense/build/wrappers/opencv/imshow/3 - Copy/binFiles/I_edge_768x1024_single_00.bin");
+    ifs.open("C:/Users/nyassin/Documents/auto_calibration/2/binFiles/I_edge_768x1024_single_00.bin");// (" C:/work/librealsense/build/wrappers/opencv/imshow/3 - Copy/binFiles/I_edge_768x1024_single_00.bin");
     std::vector<uint8_t> I_edge(768 * 1024);
     ifs.read((char*)I_edge.data(), 768 * 1024);
 
@@ -2168,16 +2158,83 @@ bool auto_cal_algo::optimaize()
     }
     std::cout << "Optimaized cost = " << params_curr.cost << std::endl;
 
+
+    // NOHA :: check scene validity
+    is_scene_valid(yuy_data, z_data);
     return optimized;
 
     return 0;
+}
+// NOHA :: my code starts here
+enum frame_t { YUY, DEPTH, IR };
+bool isEdgeDistributed(std::vector<double> yuy_weights,byte* section_map, int section_x, int section_y)
+{
+    /*sumWeightsPerSection = zeros(params.numSectionsV*params.numSectionsH,1);
+for ix = 1:params.numSectionsV*params.numSectionsH
+    sumWeightsPerSection(ix) = sum(weights(sectionMap == ix-1));
+end*/
+    std::allocator<byte> alloc;
+    double* sumWeightsPerSection = (double*)alloc.allocate(section_x * section_y);
+    for (auto i = 0; i < section_x * section_y; i++)
+    {
+        *(sumWeightsPerSection + i) = 0;
+        for (auto ii = 0; ii < width_z * height_z; ii++)
+        {
+            if (*(section_map + ii)==i)
+            {
+                *(sumWeightsPerSection + i) += yuy_weights[ii];
+            }
+        }
+    }
+    return true;
+}
+void sectionPerPixel(bool is_rgb, int section_x, int section_y, byte* section_map)
+{
+    std::allocator<byte> alloc;
+    byte* gridX = (byte*)alloc.allocate(width_z * height_z);
+    byte* gridY = (byte*)alloc.allocate(width_z * height_z);
+    auto x = width_z;
+    auto y = height_z;
+
+    if (is_rgb) {
+        x = width_yuy2;
+        y = height_yuy2;
+    }
+    // res(2) is x
+    // res(1) is y
+    for (auto i = 0; i < y; i++)
+    {
+        for (auto j = 0; j < x; j++) {
+
+            *(gridX + i * y + j) = (j * section_x / x);
+            *(gridY + i * y + j) = (i * section_y / y);
+            *(section_map + i * y + j) = (i * section_y / y) + (j * section_x / x) * section_y;
+        }
+    }
+    return;
+}
+bool auto_cal_algo::is_scene_valid(yuy2_frame_data& yuy, z_frame_data& depth)
+{
+    std::allocator<byte> alloc;
+    byte * section_map_depth = (byte*)alloc.allocate(width_z * height_z);
+    byte* section_map_rgb = (byte*)alloc.allocate(width_z * height_z);
+
+    sectionPerPixel(0, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_depth);
+    sectionPerPixel(0, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y, section_map_rgb);
+    std::vector<double> depth_weights = calculate_weights(depth);
+    //std::vector<double> yuy_weights = calculate_weights(yuy);
+    //bool rgb_edge_distributed = isEdgeDistributed(depth, section_map_rgb, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y);
+    bool depth_edge_distributed = isEdgeDistributed(depth_weights, section_map_depth, _params.num_of_sections_for_edge_distribution_x, _params.num_of_sections_for_edge_distribution_y);
+    return true;
 }
 
 int main()
 {
     auto_cal_algo auto_cal;
+    
     auto_cal.optimaize();
-
+    
+    
 
     std::cout << "Hello World!\n";
 
