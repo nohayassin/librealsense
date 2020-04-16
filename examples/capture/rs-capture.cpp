@@ -2353,10 +2353,6 @@ void auto_cal_algo::sectionPerPixel(bool is_rgb, int section_x, int section_y, u
         }
     }
 }
-bool is_positive(int i)
-{
-    return (i > 0);
-}
 bool auto_cal_algo::is_grad_dir_balanced(z_frame_data& z_data)//, yuy2_frame_data& yuy_data)
 {
     /*function [isBalanced,dirRatio1,perpRatio,dirRatio2,weightsPerDir] = isGradDirBalanced(frame,params)
