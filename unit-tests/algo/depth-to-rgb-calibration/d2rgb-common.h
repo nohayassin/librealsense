@@ -7,7 +7,7 @@
 #include "../../../src/algo/depth-to-rgb-calibration/optimizer.h"
 #include "../../../src/algo/depth-to-rgb-calibration/coeffs.h"
 #include "ac-logger.h"
-#include "../camera-info.h"
+#include "camera-params.h"
 
 ac_logger LOG_TO_STDOUT;
 
@@ -20,10 +20,10 @@ using librealsense::to_string;
 //static char const * const data_dirs[] = {""
 //};
 
-static char const* root_data_dir = "C:\\Users\\nyassin\\Documents\\realsense_all\\debug_scene\\"; // "C:\\Users\\nyassin\\Documents\\realsense_all\\";// "..\\unit-tests\\algo\\depth-to-rgb-calibration\\19.2.20\\";
+static char const * root_data_dir = "..\\unit-tests\\algo\\depth-to-rgb-calibration\\19.2.20\\";
 
 static char const* const data_dirs[] = {
-    "LongRange 768X1024 (RGB 1920X1080)"//"binFiles_avishag"//"F9440687\\Snapshots\\LongRange_D_768x1024_RGB_1920x1080"
+    "F9440687\\LongRange_D_768x1024_RGB_1920x1080"
 };
 
 static size_t const n_data_dirs = sizeof( data_dirs ) / sizeof( data_dirs[0] );
