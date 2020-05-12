@@ -700,8 +700,9 @@ void optimizer::set_depth_data(
        zValuesForSubEdges = min(localZvalues,[],2);
        edgeSubPixel = fliplr(locRCsub);% From Row-Col to XY*/
 
+    // find corresponding points on Z frame 
+
     std::vector<double > ::iterator loc_edg_it = _ir.local_edges.begin();
-    //std::vector<double > ::iterator loc_rc_sub_it = _depth.local_rc_subpixel.begin(); // locRCsub
     auto valid_loc_rc = _ir.valid_location_rc.begin(); // locRC
     auto  dir_per_pixel_it = _ir.direction_per_pixel.begin(); // dirPerPixel
 
@@ -868,7 +869,7 @@ end*/
     depth_filter(_z.grad_in_direction_inside, _z.grad_in_direction, _z.is_inside, 1, _z.is_inside.size());
     depth_filter(_z.directions, _z.valid_directions, _z.is_inside, 1, _z.is_inside.size());
     depth_filter(_z.vertices, _z.vertices_all, _z.is_inside, 1, _z.is_inside.size());
-    depth_filter(_z.section_map_depth_inside, _z.section_map_depth, _z.is_inside, 1, _z.is_inside.size());
+    depth_filter(_z.section_map_depth_inside, _z.valid_section_map, _z.is_inside, 1, _z.is_inside.size());
 
     for (auto i = 0; i < _z.is_inside.size(); i++) {
         _z.weights.push_back(_params.const_weights_val);
