@@ -57,7 +57,7 @@ namespace depth_to_rgb_calibration {
 
         double edge_distribution_min_max_ratio = 0.005;
         double grad_dir_ratio = 10;
-        double grad_dir_ratio_prep = 1.5;
+        double grad_dir_ratio_prep =  1.5;
         size_t dilation_size = 3;
         double gauss_sigma = 1;
         size_t gause_kernel_size = 5;
