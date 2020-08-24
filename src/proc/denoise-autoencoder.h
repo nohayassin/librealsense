@@ -9,10 +9,6 @@ namespace librealsense
     public:
         denoise_autoencoder();
 
-    protected:
-      
-
-
     private:
 
         size_t                  _width, _height, _stride;

@@ -13,17 +13,12 @@
 
 namespace librealsense
 {
-    // The holes filling mode
-    const uint8_t hole_fill_min = hf_fill_from_left;
-    const uint8_t hole_fill_max = hf_max_value - 1;
-    const uint8_t hole_fill_step = 1;
-    const uint8_t hole_fill_def = hf_farest_from_around;
 
     denoise_autoencoder::denoise_autoencoder() :
         depth_processing_block("Denoise Autoencoder"),
         _width(0), _height(0), _stride(0)
     {
-        return;
+
     }
 
 
