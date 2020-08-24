@@ -20,6 +20,8 @@ namespace librealsense
         _extension_type(RS2_EXTENSION_DEPTH_FRAME),
         _current_frm_size_pixels(0)
     {
+        _stream_filter.stream = RS2_STREAM_DEPTH;
+        _stream_filter.format = RS2_FORMAT_Z16;
 
     }
 
@@ -33,7 +35,20 @@ namespace librealsense
 
     void  denoise_autoencoder::update_configuration(const rs2::frame& f)
     {
-       
+        if (f.get_profile().get() != _source_stream_profile.get())
+        {
+            _source_stream_profile = f.get_profile();
+            _target_stream_profile = _source_stream_profile.clone(RS2_STREAM_DEPTH, 0, _source_stream_profile.format());
+
+            _extension_type = f.is<rs2::disparity_frame>() ? RS2_EXTENSION_DISPARITY_FRAME : RS2_EXTENSION_DEPTH_FRAME;
+            _bpp = (_extension_type == RS2_EXTENSION_DISPARITY_FRAME) ? sizeof(float) : sizeof(uint16_t);
+            auto vp = _target_stream_profile.as<rs2::video_stream_profile>();
+            _width = vp.width();
+            _height = vp.height();
+            _stride = _width * _bpp;
+            _current_frm_size_pixels = _width * _height;
+
+        }
     }
 
     rs2::frame denoise_autoencoder::prepare_target_frame(const rs2::frame& f, const rs2::frame_source& source)

@@ -22,7 +22,6 @@ namespace librealsense
         size_t                  _current_frm_size_pixels;
         rs2::stream_profile     _source_stream_profile;
         rs2::stream_profile     _target_stream_profile;
-        uint8_t                 _hole_filling_mode;
     };
     MAP_EXTENSION(RS2_EXTENSION_DENOISE_AUTOENCODER, librealsense::denoise_autoencoder);
 }
