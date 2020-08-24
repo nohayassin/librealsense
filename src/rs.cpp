@@ -29,6 +29,7 @@
 #include "proc/spatial-filter.h"
 #include "proc/zero-order.h"
 #include "proc/hole-filling-filter.h"
+#include "denoise-autoencoder.h"
 #include "proc/color-formats-converter.h"
 #include "proc/rates-printer.h"
 #include "media/playback/playback_device.h"
@@ -1466,7 +1467,8 @@ int rs2_is_processing_block_extendable_to(const rs2_processing_block* f, rs2_ext
     case RS2_EXTENSION_HOLE_FILLING_FILTER: return VALIDATE_INTERFACE_NO_THROW((processing_block_interface*)(f->block.get()), librealsense::hole_filling_filter) != nullptr;
     case RS2_EXTENSION_ZERO_ORDER_FILTER: return VALIDATE_INTERFACE_NO_THROW((processing_block_interface*)(f->block.get()), librealsense::zero_order) != nullptr;
     case RS2_EXTENSION_DEPTH_HUFFMAN_DECODER: return VALIDATE_INTERFACE_NO_THROW((processing_block_interface*)(f->block.get()), librealsense::depth_decompression_huffman) != nullptr;
-  
+    case RS2_EXTENSION_DENOISE_AUTOENCODER: return VALIDATE_INTERFACE_NO_THROW((processing_block_interface*)(f->block.get()), librealsense::denoise_autoencoder) != nullptr;
+
     default:
         return false;
     }
@@ -2236,6 +2238,14 @@ HANDLE_EXCEPTIONS_AND_RETURN(nullptr, transform_to_disparity)
 rs2_processing_block* rs2_create_hole_filling_filter_block(rs2_error** error) BEGIN_API_CALL
 {
     auto block = std::make_shared<librealsense::hole_filling_filter>();
+
+    return new rs2_processing_block{ block };
+}
+NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
+
+rs2_processing_block* rs2_create_denoise_autoencoder_block(rs2_error** error) BEGIN_API_CALL
+{
+    auto block = std::make_shared<librealsense::denoise_autoencoder>();
 
     return new rs2_processing_block{ block };
 }

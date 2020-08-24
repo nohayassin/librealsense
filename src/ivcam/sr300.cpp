@@ -9,6 +9,7 @@
 #include "proc/spatial-filter.h"
 #include "proc/temporal-filter.h"
 #include "proc/hole-filling-filter.h"
+#include "denoise-autoencoder.h"
 #include "proc/depth-formats-converter.h"
 #include "ds5/ds5-device.h"
 #include "../../include/librealsense2/h/rs_sensor.h"
@@ -630,6 +631,7 @@ namespace librealsense
         res.push_back(std::make_shared<spatial_filter>());
         res.push_back(std::make_shared<temporal_filter>());
         res.push_back(std::make_shared<hole_filling_filter>());
+        res.push_back(std::make_shared<denoise_autoencoder>());
         return res;
     }
 }

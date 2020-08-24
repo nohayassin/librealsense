@@ -33,6 +33,7 @@
 #include "proc/color-formats-converter.h"
 #include "proc/syncer-processing-block.h"
 #include "proc/hole-filling-filter.h"
+#include "denoise-autoencoder.h"
 #include "proc/depth-formats-converter.h"
 #include "proc/depth-decompress.h"
 #include "../common/fw/firmware-version.h"
@@ -1041,6 +1042,7 @@ namespace librealsense
         res.push_back(std::make_shared<temporal_filter>());
         res.push_back(std::make_shared<hole_filling_filter>());
         res.push_back(std::make_shared<disparity_transform>(false));
+        res.push_back(std::make_shared<denoise_autoencoder>());
         return res;
     }
 

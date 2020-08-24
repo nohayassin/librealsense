@@ -210,6 +210,7 @@ typedef enum rs2_extension
     RS2_EXTENSION_AUTO_CALIBRATION_FILTER,
     RS2_EXTENSION_DEVICE_CALIBRATION,
     RS2_EXTENSION_CALIBRATED_SENSOR,
+    RS2_EXTENSION_DENOISE_AUTOENCODER,
     RS2_EXTENSION_COUNT
 } rs2_extension;
 const char* rs2_extension_type_to_string(rs2_extension type);
