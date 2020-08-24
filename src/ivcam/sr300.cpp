@@ -9,7 +9,7 @@
 #include "proc/spatial-filter.h"
 #include "proc/temporal-filter.h"
 #include "proc/hole-filling-filter.h"
-#include "denoise-autoencoder.h"
+#include "proc/denoise-autoencoder.h"
 #include "proc/depth-formats-converter.h"
 #include "ds5/ds5-device.h"
 #include "../../include/librealsense2/h/rs_sensor.h"

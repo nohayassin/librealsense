@@ -29,7 +29,7 @@
 #include "proc/spatial-filter.h"
 #include "proc/zero-order.h"
 #include "proc/hole-filling-filter.h"
-#include "denoise-autoencoder.h"
+#include "proc/denoise-autoencoder.h"
 #include "proc/color-formats-converter.h"
 #include "proc/rates-printer.h"
 #include "media/playback/playback_device.h"

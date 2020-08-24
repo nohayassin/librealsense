@@ -33,7 +33,7 @@
 #include "proc/color-formats-converter.h"
 #include "proc/syncer-processing-block.h"
 #include "proc/hole-filling-filter.h"
-#include "denoise-autoencoder.h"
+#include "proc/denoise-autoencoder.h"
 #include "proc/depth-formats-converter.h"
 #include "proc/depth-decompress.h"
 #include "../common/fw/firmware-version.h"
