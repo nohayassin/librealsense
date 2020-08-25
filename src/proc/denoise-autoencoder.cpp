@@ -10,6 +10,9 @@
 #include "software-device.h"
 #include "proc/synthetic-stream.h"
 #include "denoise-autoencoder.h"
+#include "../../wrappers/opencv/cv-helpers.hpp"
+
+
 
 namespace librealsense
 {
@@ -29,6 +32,12 @@ namespace librealsense
     {
         update_configuration(f);
         auto tgt = prepare_target_frame(f, source);
+
+        // apply denoise autoencoder model prediction
+        if (_extension_type == RS2_EXTENSION_DISPARITY_FRAME)
+            run_denoise_prediction<float>(const_cast<void*>(tgt.get_data()));
+        else
+            run_denoise_prediction<uint16_t>(const_cast<void*>(tgt.get_data()));
 
         return tgt;
     }

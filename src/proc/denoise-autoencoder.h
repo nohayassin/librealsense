@@ -14,6 +14,14 @@ namespace librealsense
         rs2::frame process_frame(const rs2::frame_source& source, const rs2::frame& f) override;
         rs2::frame prepare_target_frame(const rs2::frame& f, const rs2::frame_source& source);
 
+        template<typename T>
+        void run_denoise_prediction(void* image_data)
+        {
+            bool fp = (std::is_floating_point<T>::value);
+            T* data = reinterpret_cast<T*>(image_data);
+            int a = 1;
+        }
+
     private:
 
         size_t                  _width, _height, _stride;
