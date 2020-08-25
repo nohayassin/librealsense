@@ -11,7 +11,9 @@
 #include "proc/synthetic-stream.h"
 #include "denoise-autoencoder.h"
 #include "../../wrappers/opencv/cv-helpers.hpp"
-
+#include <opencv2/dnn.hpp>
+using namespace cv;
+using namespace cv::dnn;
 
 
 namespace librealsense
@@ -21,7 +23,8 @@ namespace librealsense
         depth_processing_block("Denoise Autoencoder"),
         _width(0), _height(0), _stride(0), _bpp(0),
         _extension_type(RS2_EXTENSION_DEPTH_FRAME),
-        _current_frm_size_pixels(0)
+        _current_frm_size_pixels(0),
+        _model_path("C:\\work\\ML\\expirements_models_denoised\\erosion\\unet model - 50 epochs - strides 300 - erosion 3 - Binary - NO IR\\DEPTH_20200816-132611.model\\saved_model.pb")
     {
         _stream_filter.stream = RS2_STREAM_DEPTH;
         _stream_filter.format = RS2_FORMAT_Z16;
@@ -32,6 +35,16 @@ namespace librealsense
     {
         update_configuration(f);
         auto tgt = prepare_target_frame(f, source);
+
+        std::string modelRecognition = _model_path;
+        Net recognizer;
+        if (!modelRecognition.empty())
+            recognizer = readNet(modelRecognition);
+        
+        Mat image(_height, _width, CV_16UC1, (uint16_t*)tgt.get_data());
+        recognizer.setInput(image);
+        Mat result = recognizer.forward();
+
 
         // apply denoise autoencoder model prediction
         if (_extension_type == RS2_EXTENSION_DISPARITY_FRAME)
