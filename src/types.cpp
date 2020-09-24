@@ -20,6 +20,35 @@ const double SQRT_DBL_EPSILON = sqrt(std::numeric_limits<double>::epsilon());
 
 namespace librealsense
 {
+    // The extrinsics on the camera ("raw extrinsics") are in milimeters, but LRS works in meters
+    // Additionally, LRS internal algorithms are
+    // written with a transposed matrix in mind! (see rs2_transform_point_to_point)
+    rs2_extrinsics to_raw_extrinsics(rs2_extrinsics extr)
+    {
+        float const meters_to_milimeters = 1000;
+        extr.translation[0] *= meters_to_milimeters;
+        extr.translation[1] *= meters_to_milimeters;
+        extr.translation[2] *= meters_to_milimeters;
+
+        std::swap(extr.rotation[1], extr.rotation[3]);
+        std::swap(extr.rotation[2], extr.rotation[6]);
+        std::swap(extr.rotation[5], extr.rotation[7]);
+        return extr;
+    }
+
+    rs2_extrinsics from_raw_extrinsics(rs2_extrinsics extr)
+    {
+        float const milimeters_to_meters = 0.001f;
+        extr.translation[0] *= milimeters_to_meters;
+        extr.translation[1] *= milimeters_to_meters;
+        extr.translation[2] *= milimeters_to_meters;
+
+        std::swap(extr.rotation[1], extr.rotation[3]);
+        std::swap(extr.rotation[2], extr.rotation[6]);
+        std::swap(extr.rotation[5], extr.rotation[7]);
+        return extr;
+    }
+
     std::string make_less_screamy(const char* str)
     {
         std::string res(str);
@@ -46,7 +75,7 @@ namespace librealsense
         rs2_exception_type exception_type) noexcept
         : librealsense_exception(msg, exception_type)
     {
-        LOG_WARNING(msg);
+        LOG_DEBUG("recoverable_exception: " << msg);
     }
 
     bool file_exists(const char* filename)
@@ -145,13 +174,47 @@ namespace librealsense
 #define CASE(X) STRCASE(SENSOR_MODE, X)
         switch (value)
         {
-            CASE(XGA)
             CASE(VGA)
+            CASE(XGA)
+            CASE(QVGA)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
     }
-    
+
+    const char* get_string( rs2_calibration_type type )
+    {
+#define CASE(X) STRCASE(CALIBRATION, X)
+        switch( type )
+        {
+        CASE( AUTO_DEPTH_TO_RGB )
+        CASE( MANUAL_DEPTH_TO_RGB )
+        default: assert( !is_valid( type ) ); return UNKNOWN_VALUE;
+        }
+#undef CASE
+    }
+
+    const char* get_string( rs2_calibration_status value )
+    {
+#define CASE(X) STRCASE(CALIBRATION, X)
+        switch( value )
+        {
+        CASE( TRIGGERED )
+        CASE( SPECIAL_FRAME )
+        CASE( STARTED )
+        CASE( NOT_NEEDED )
+        CASE( SUCCESSFUL )
+        
+        CASE( BAD_CONDITIONS )
+        CASE( FAILED )
+        CASE( SCENE_INVALID )
+        CASE( BAD_RESULT )
+        CASE( RETRY )
+        default: assert( !is_valid( value ) ); return UNKNOWN_VALUE;
+        }
+#undef CASE
+    }
+
     const char* get_string(rs2_ambient_light value)
     {
 #define CASE(X) STRCASE(AMBIENT_LIGHT, X)
@@ -160,6 +223,19 @@ namespace librealsense
             CASE(NO_AMBIENT)
             CASE(LOW_AMBIENT)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
+        }
+#undef CASE
+    }
+
+    const char* get_string( rs2_cah_trigger value )
+    {
+#define CASE(X) STRCASE(CAH_TRIGGER, X)
+        switch( value )
+        {
+        CASE( MANUAL )
+        CASE( NOW )
+        CASE( AUTO )
+        default: assert( !is_valid( value ) ); return UNKNOWN_VALUE;
         }
 #undef CASE
     }
@@ -216,6 +292,10 @@ namespace librealsense
             CASE(FISHEYE_SENSOR)
             CASE(DEPTH_HUFFMAN_DECODER)
             CASE(SERIALIZABLE)
+            CASE(FW_LOGGER)
+            CASE(AUTO_CALIBRATION_FILTER)
+            CASE(DEVICE_CALIBRATION)
+            CASE(CALIBRATED_SENSOR)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -320,13 +400,17 @@ namespace librealsense
             CASE(ZERO_ORDER_ENABLED)
             CASE(ENABLE_MAP_PRESERVATION)
             CASE(FREEFALL_DETECTION_ENABLED)
-            CASE(AVALANCHE_PHOTO_DIODE)
+            case RS2_OPTION_AVALANCHE_PHOTO_DIODE: return "Receiver Gain";
             CASE(POST_PROCESSING_SHARPENING)
             CASE(PRE_PROCESSING_SHARPENING)
             CASE(NOISE_FILTERING)
             CASE(INVALIDATION_BYPASS)
             CASE(AMBIENT_LIGHT)
             CASE(SENSOR_MODE)
+            CASE(EMITTER_ALWAYS_ON)
+            CASE(THERMAL_COMPENSATION)
+            CASE(TRIGGER_CAMERA_ACCURACY_HEALTH)
+            CASE(RESET_CAMERA_ACCURACY_HEALTH)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -405,6 +489,7 @@ namespace librealsense
             CASE(USB_TYPE_DESCRIPTOR)
             CASE(ASIC_SERIAL_NUMBER)
             CASE(FIRMWARE_UPDATE_ID)
+            CASE(IP_ADDRESS)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -447,6 +532,7 @@ namespace librealsense
             CASE(FRAME_EMITTER_MODE)
             CASE(FRAME_LED_POWER)
             CASE(RAW_FRAME_SIZE)
+            CASE(GPIO_INPUT_DATA)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;
         }
 #undef CASE
@@ -504,8 +590,10 @@ namespace librealsense
         {
             CASE(CUSTOM)
             CASE(DEFAULT)
-            CASE(NO_AMBIENT)
-            CASE(LOW_AMBIENT)
+            //CASE(NO_AMBIENT)
+            case RS2_L500_VISUAL_PRESET_NO_AMBIENT: return "No Ambient Light";
+            //CASE(LOW_AMBIENT)
+            case RS2_L500_VISUAL_PRESET_LOW_AMBIENT: return "Low Ambient Light";
             CASE(MAX_RANGE)
             CASE(SHORT_RANGE)
         default: assert(!is_valid(value)); return UNKNOWN_VALUE;

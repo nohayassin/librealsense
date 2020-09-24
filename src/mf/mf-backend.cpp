@@ -81,13 +81,16 @@ namespace librealsense
             // Give the device a chance to restart, if we don't catch
             // it, the watcher will find it later.
             if(tm_boot(device_infos)) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                std::this_thread::sleep_for(std::chrono::milliseconds(2000));
                 device_infos = usb_enumerator::query_devices_info();
             }
             return device_infos;
         }
 
-        wmf_hid_device::wmf_hid_device(const hid_device_info& info)
+        wmf_hid_device::wmf_hid_device(const hid_device_info& info,
+                                       std::shared_ptr<const wmf_backend> backend)
+            : _backend(std::move(backend)),
+              _cb(nullptr)
         {
             bool found = false;
 
@@ -107,7 +110,7 @@ namespace librealsense
 
         std::shared_ptr<hid_device> wmf_backend::create_hid_device(hid_device_info info) const
         {
-            return std::make_shared<wmf_hid_device>(info);
+            return std::make_shared<wmf_hid_device>(info, shared_from_this());
         }
 
         std::vector<hid_device_info> wmf_backend::query_hid_devices() const

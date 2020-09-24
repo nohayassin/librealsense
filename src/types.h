@@ -26,6 +26,7 @@
 #define _USE_MATH_DEFINES
 #endif
 #include <cmath>                            // For acos
+#include <ctime>
 #include <stdint.h>
 #include <cassert>                          // For assert
 #include <cstring>                          // For memcmp
@@ -58,6 +59,11 @@ static const double d2r = pi / 180;
 static const double r2d = 180 / pi;
 template<typename T> T deg2rad(T val) { return T(val * d2r); }
 template<typename T> T rad2deg(T val) { return T(val * r2d); }
+
+// global abs() is only defined for int for some GCC impl on Linux, meaning we may
+// get unwanted behavior without any warning whatsoever. Instead, we want to use the
+// C++ version in std!
+using std::abs;
 
 #pragma warning(disable: 4250)
 
@@ -502,19 +508,34 @@ namespace librealsense
     // Enumerated type support //
     /////////////////////////////
 
-#define RS2_ENUM_HELPERS(TYPE, PREFIX) RS2_ENUM_HELPERS_CUSTOMIZED(TYPE, PREFIX, 0, RS2_##PREFIX##_COUNT)
+// Require the last enumerator value to be in format of RS2_#####_COUNT
+#define RS2_ENUM_HELPERS( TYPE, PREFIX )                                                           \
+    RS2_ENUM_HELPERS_CUSTOMIZED( TYPE, 0, RS2_##PREFIX##_COUNT - 1 )
 
-#define RS2_ENUM_HELPERS_CUSTOMIZED(TYPE, PREFIX, START, END) LRS_EXTENSION_API const char* get_string(TYPE value); \
-        inline bool is_valid(TYPE value) { return value >= START && value <END; } \
-        inline std::ostream & operator << (std::ostream & out, TYPE value) { if(is_valid(value)) return out << get_string(value); else return out << (int)value; } \
-        inline bool try_parse(const std::string& str, TYPE& res)       \
-        {                                                            \
-            for (int i = START; i < END; i++) {                      \
-                auto v = static_cast<TYPE>(i);                       \
-                if(str == get_string(v)) { res = v; return true; }   \
-            }                                                        \
-            return false;                                            \
-        }
+// This macro can be used directly if needed to support enumerators with no RS2_#####_COUNT last value
+#define RS2_ENUM_HELPERS_CUSTOMIZED( TYPE, FIRST, LAST )                                           \
+    LRS_EXTENSION_API const char * get_string( TYPE value );                                       \
+    inline bool is_valid( TYPE value ) { return value >= FIRST && value <= LAST; }                 \
+    inline std::ostream & operator<<( std::ostream & out, TYPE value )                             \
+    {                                                                                              \
+        if( is_valid( value ) )                                                                    \
+            return out << get_string( value );                                                     \
+        else                                                                                       \
+            return out << (int)value;                                                              \
+    }                                                                                              \
+    inline bool try_parse( const std::string & str, TYPE & res )                                   \
+    {                                                                                              \
+        for( int i = FIRST; i <= LAST; i++ )                                                       \
+        {                                                                                          \
+            auto v = static_cast< TYPE >( i );                                                     \
+            if( str == get_string( v ) )                                                           \
+            {                                                                                      \
+                res = v;                                                                           \
+                return true;                                                                       \
+            }                                                                                      \
+        }                                                                                          \
+        return false;                                                                              \
+    }
 
     RS2_ENUM_HELPERS(rs2_stream, STREAM)
     RS2_ENUM_HELPERS(rs2_format, FORMAT)
@@ -532,7 +553,11 @@ namespace librealsense
     RS2_ENUM_HELPERS(rs2_matchers, MATCHER)
     RS2_ENUM_HELPERS(rs2_sensor_mode, SENSOR_MODE)
     RS2_ENUM_HELPERS(rs2_l500_visual_preset, L500_VISUAL_PRESET)
-    RS2_ENUM_HELPERS_CUSTOMIZED(rs2_ambient_light, AMBIENT_LIGHT, RS2_AMBIENT_LIGHT_NO_AMBIENT, RS2_AMBIENT_LIGHT_LOW_AMBIENT)
+    RS2_ENUM_HELPERS(rs2_calibration_type, CALIBRATION_TYPE)
+    RS2_ENUM_HELPERS_CUSTOMIZED(rs2_calibration_status, RS2_CALIBRATION_STATUS_FIRST, RS2_CALIBRATION_STATUS_LAST )
+    RS2_ENUM_HELPERS_CUSTOMIZED(rs2_ambient_light, RS2_AMBIENT_LIGHT_NO_AMBIENT, RS2_AMBIENT_LIGHT_LOW_AMBIENT)
+    RS2_ENUM_HELPERS(rs2_cah_trigger, CAH_TRIGGER)
+
 
     ////////////////////////////////////////////
     // World's tiniest linear algebra library //
@@ -587,19 +612,13 @@ namespace librealsense
                 r.rotation[j * 3 + i] = (i == j) ? 1.f : 0.f;
         return r;
     }
-    inline bool operator==(const rs2_extrinsics& a, const rs2_extrinsics& b)
-    {
-        for (int i = 0; i < 3; i++)
-            if (a.translation[i] != b.translation[i])
-                return false;
-        for (int j = 0; j < 3; j++)
-            for (int i = 0; i < 3; i++)
-                if (std::fabs(a.rotation[j * 3 + i] - b.rotation[j * 3 + i])
-                     > std::numeric_limits<float>::epsilon())
-                    return false;
-        return true;
-    }
     inline rs2_extrinsics inverse(const rs2_extrinsics& a) { auto p = to_pose(a); return from_pose(inverse(p)); }
+
+    // The extrinsics on the camera ("raw extrinsics") are in milimeters, but LRS works in meters
+    // Additionally, LRS internal algorithms are
+    // written with a transposed matrix in mind! (see rs2_transform_point_to_point)
+    rs2_extrinsics to_raw_extrinsics(rs2_extrinsics);
+    rs2_extrinsics from_raw_extrinsics(rs2_extrinsics);
 
     inline std::ostream& operator <<(std::ostream& stream, const float3& elem)
     {
@@ -643,7 +662,7 @@ namespace librealsense
             uint32_t w = 0, uint32_t h = 0,
             uint32_t framerate = 0,
             resolution_func res_func = [](resolution res) { return res; }) :
-            format(fmt), stream(strm), index(idx), height(h), width(w), stream_resolution(res_func), fps(framerate)
+            format(fmt), stream(strm), index(idx), width(w), height(h), fps(framerate), stream_resolution(res_func)
         {}
 
         rs2_format format;
@@ -651,6 +670,8 @@ namespace librealsense
         int index;
         uint32_t width, height, fps;
         resolution_func stream_resolution; // Calculates the relevant resolution from the given backend resolution.
+
+        std::pair< uint32_t, uint32_t > width_height() const { return std::make_pair( width, height ); }
     };
 
 
@@ -900,7 +921,7 @@ namespace librealsense
             {
                 try { fptr(frame, user); } catch (...)
                 {
-                    LOG_ERROR("Received an execption from frame callback!");
+                    LOG_ERROR("Received an exception from frame callback!");
                 }
             }
         }
@@ -923,7 +944,7 @@ namespace librealsense
                 try { fptr(frame, source, user); }
                 catch (...)
                 {
-                    LOG_ERROR("Received an execption from frame callback!");
+                    LOG_ERROR("Received an exception from frame callback!");
                 }
             }
         }
@@ -963,7 +984,32 @@ namespace librealsense
                 try { nptr(notification, user); }
                 catch (...)
                 {
-                    LOG_ERROR("Received an execption from frame callback!");
+                    LOG_ERROR("Received an exception from notification callback!");
+                }
+            }
+        }
+        void release() override { delete this; }
+    };
+
+    typedef void(*software_device_destruction_callback_function_ptr)(void * user);
+
+    class software_device_destruction_callback : public rs2_software_device_destruction_callback
+    {
+        software_device_destruction_callback_function_ptr nptr;
+        void * user;
+    public:
+        software_device_destruction_callback() : software_device_destruction_callback(nullptr, nullptr) {}
+        software_device_destruction_callback(software_device_destruction_callback_function_ptr on_destruction, void * user)
+            : nptr(on_destruction), user(user) {}
+
+        operator bool() const { return nptr != nullptr; }
+        void on_destruction() override {
+            if (nptr)
+            {
+                try { nptr(user); }
+                catch (...)
+                {
+                    LOG_ERROR("Received an exception from software device destruction callback!");
                 }
             }
         }
@@ -987,7 +1033,7 @@ namespace librealsense
                 try { nptr(removed, added, user); }
                 catch (...)
                 {
-                    LOG_ERROR("Received an execption from frame callback!");
+                    LOG_ERROR("Received an exception from devices_changed callback!");
                 }
             }
         }
@@ -1020,6 +1066,8 @@ namespace librealsense
     typedef std::shared_ptr<rs2_frame_callback> frame_callback_ptr;
     typedef std::shared_ptr<rs2_frame_processor_callback> frame_processor_callback_ptr;
     typedef std::shared_ptr<rs2_notifications_callback> notifications_callback_ptr;
+    typedef std::shared_ptr<rs2_calibration_change_callback> calibration_change_callback_ptr;
+    typedef std::shared_ptr<rs2_software_device_destruction_callback> software_device_destruction_callback_ptr;
     typedef std::shared_ptr<rs2_devices_changed_callback> devices_changed_callback_ptr;
     typedef std::shared_ptr<rs2_update_progress_callback> update_progress_callback_ptr;
 
@@ -1732,6 +1780,64 @@ namespace librealsense
 
 }
 
+inline std::ostream& operator<<( std::ostream& out, rs2_extrinsics const & e )
+{
+    return out
+        << "[ r["
+        << e.rotation[0] << "," << e.rotation[1] << "," << e.rotation[2] << "," << e.rotation[3] << "," << e.rotation[4] << ","
+        << e.rotation[5] << "," << e.rotation[6] << "," << e.rotation[7] << "," << e.rotation[8]
+        << "]  t[" << e.translation[0] << "," << e.translation[1] << "," << e.translation[2] << "] ]";
+}
+
+inline std::ostream& operator<<( std::ostream& out, rs2_intrinsics const & i )
+{
+    return out
+        << "[ " << i.width << "x" << i.height
+        << "  p[" << i.ppx << " " << i.ppy << "]"
+        << "  f[" << i.fx << " " << i.fy << "]"
+        << "  " << librealsense::get_string( i.model )
+        << " [" << i.coeffs[0] << " " << i.coeffs[1] << " " << i.coeffs[2]
+        << " " << i.coeffs[3] << " " << i.coeffs[4]
+        << "] ]";
+}
+
+inline std::ostream& operator<<( std::ostream& s, rs2_dsm_params const & self )
+{
+    s << "[ ";
+    if( self.timestamp )
+    {
+        time_t t = self.timestamp;
+        auto ptm = localtime( &t );
+        char buf[256];
+        strftime( buf, sizeof( buf ), "%F.%T ", ptm );
+        s << buf;
+
+        unsigned patch = self.version & 0xF;
+        unsigned minor = (self.version >> 4) & 0xFF;
+        unsigned major = (self.version >> 12);
+        s << major << '.' << minor << '.' << patch << ' ';
+    }
+    else
+    {
+        s << "new: ";
+    }
+    switch( self.model )
+    {
+    case RS2_DSM_CORRECTION_NONE: break;
+    case RS2_DSM_CORRECTION_AOT: s << "AoT "; break;
+    case RS2_DSM_CORRECTION_TOA: s << "ToA "; break;
+    }
+    s << "x[" << self.h_scale << " " << self.v_scale << "] ";
+    s << "+[" << self.h_offset << " " << self.v_offset;
+    if( self.rtd_offset )
+        s << " rtd " << self.rtd_offset;
+    s << "]";
+    if( self.temp_x2 )
+        s << " @" << float( self.temp_x2 ) / 2 << "degC";
+    s << " ]";
+    return s;
+}
+
 template<typename T>
 uint32_t rs_fourcc(const T a, const T b, const  T c, const T d)
 {
@@ -1807,23 +1913,36 @@ std::vector<std::shared_ptr<T>> subtract_sets(const std::vector<std::shared_ptr<
     return results;
 }
 
-    enum res_type {
-        low_resolution,
-        medium_resolution,
-        high_resolution
-    };
+enum res_type {
+    low_resolution,
+    medium_resolution,
+    high_resolution
+};
 
-    inline res_type get_res_type(uint32_t width, uint32_t height)
-    {
-        if (width == 256) // Crop resolution
-            return res_type::high_resolution;
-
-        if (width == 640)
-            return res_type::medium_resolution;
-        else if (width < 640)
-            return res_type::low_resolution;
-
+inline res_type get_res_type(uint32_t width, uint32_t height)
+{
+    if (width == 256) // Crop resolution
         return res_type::high_resolution;
-    }
+
+    if (width == 640)
+        return res_type::medium_resolution;
+    else if (width < 640)
+        return res_type::low_resolution;
+
+    return res_type::high_resolution;
+}
+
+inline bool operator==( const rs2_extrinsics& a, const rs2_extrinsics& b )
+{
+    for( int i = 0; i < 3; i++ )
+        if( a.translation[i] != b.translation[i] )
+            return false;
+    for( int j = 0; j < 3; j++ )
+        for( int i = 0; i < 3; i++ )
+            if( std::fabs( a.rotation[j * 3 + i] - b.rotation[j * 3 + i] )
+        > std::numeric_limits<float>::epsilon() )
+                return false;
+    return true;
+}
 
 #endif
