@@ -2421,6 +2421,7 @@ TEST_CASE("Connect events works", "[live]") {
     }
 }
 
+
 std::shared_ptr<std::function<void(rs2::frame fref)>> check_stream_sanity(const context& ctx, const sensor& sub, int num_of_frames, bool infinite = false)
 {
     std::shared_ptr<std::condition_variable> cv = std::make_shared<std::condition_variable>();
@@ -3210,6 +3211,134 @@ TEST_CASE("Pipeline enable stream", "[live][pipeline][using_pipeline]") {
         REQUIRE_NOTHROW(pipe.stop());
         validate(frames, timestamps, dev_requests[PID], actual_fps);
     }
+}
+TEST_CASE("HW reset functionality", "[live]") {
+
+    std::cout << "NOHA :: HW reset functionality" << std::endl; //"Connect events works"
+    rs2::context ctx;
+
+    if (make_context(SECTION_FROM_TEST_NAME, &ctx, "2.13.0"))
+    {
+        for (auto i = 0; i < 30; i++) // execute 30 HW resets
+        {
+            rs2::device dev;
+            rs2::pipeline pipe(ctx);
+            rs2::config cfg;
+            rs2::pipeline_profile profile;
+            REQUIRE_NOTHROW(profile = cfg.resolve(pipe));
+            REQUIRE(profile);
+            REQUIRE_NOTHROW(dev = profile.get_device());
+            REQUIRE(dev);
+            disable_sensitive_options_for(dev);
+            dev_type PID = get_PID(dev);
+            CAPTURE(PID.first);
+            CAPTURE(PID.second);
+
+            if (pipeline_default_configurations.end() == pipeline_default_configurations.find(PID))
+            {
+                WARN("Skipping test - the Device-Under-Test profile is not defined for PID " << PID.first << (PID.second ? " USB3" : " USB2"));
+            }
+            else
+            {
+                REQUIRE(pipeline_default_configurations.at(PID).streams.size() > 0);
+
+                REQUIRE_NOTHROW(pipe.start(cfg));
+
+                std::vector<std::vector<stream_profile>> frames;
+                std::vector<std::vector<double>> timestamps;
+
+                auto actual_fps = pipeline_default_configurations.at(PID).fps;
+
+                // HW Reset defs
+                device_list list;
+                REQUIRE_NOTHROW(list = ctx.query_devices());
+
+                auto dev = make_device(list);
+                auto dev_strong = dev.first;
+                auto dev_weak = dev.second;
+
+                std::string serial;
+
+                REQUIRE_NOTHROW(serial = dev_strong->get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+
+                auto disconnected = false;
+                auto connected = false;
+                std::condition_variable cv;
+                std::mutex m;
+
+                while (frames.size() < 100)
+                {
+                    frameset frame;
+                    REQUIRE_NOTHROW(frame = pipe.wait_for_frames(10000));
+                    std::vector<stream_profile> frames_set;
+                    std::vector<double> ts;
+
+                    for (auto f : frame)
+                    {
+                        if (f.supports_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS))
+                        {
+                            auto val = static_cast<int>(f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS));
+                            if (val < actual_fps)
+                                actual_fps = val;
+                        }
+                        frames_set.push_back(f.get_profile());
+                        ts.push_back(f.get_timestamp());
+                    }
+                    frames.push_back(frames_set);
+                    timestamps.push_back(ts);
+                }
+
+                //Setting up devices change callback to notify the test about device disconnection and connection
+                REQUIRE_NOTHROW(ctx.set_devices_changed_callback([&, dev_weak](event_information& info) mutable
+                    {
+                        auto&& strong = dev_weak.lock();
+                        {
+                            if (strong)
+                            {
+                                if (info.was_removed(*strong))
+                                {
+                                    std::unique_lock<std::mutex> lock(m);
+                                    disconnected = true;
+                                    cv.notify_one();
+                                }
+
+
+                                for (auto d : info.get_new_devices())
+                                {
+                                    if (serial == d.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER))
+                                    {
+                                        try
+                                        {
+                                            std::unique_lock<std::mutex> lock(m);
+
+                                            reset_device(dev_strong, dev_weak, list, d);
+
+                                            connected = true;
+                                            cv.notify_one();
+                                            break;
+                                        }
+                                        catch (...)
+                                        {
+
+                                        }
+                                    }
+                                }
+                            }
+
+                        }}));
+
+                //forcing hardware reset to simulate device disconnection
+                do_with_waiting_for_camera_connection(ctx, dev_strong, serial, [&]()
+                    {
+                        dev_strong->hardware_reset();
+                    });
+
+                REQUIRE_NOTHROW(pipe.stop());
+                validate(frames, timestamps, pipeline_default_configurations.at(PID), actual_fps);
+            }
+        }
+    }
+
 }
 
 static const std::map<dev_type, device_profiles> pipeline_autocomplete_configurations = {
