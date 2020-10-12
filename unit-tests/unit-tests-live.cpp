@@ -458,6 +458,7 @@ TEST_CASE("Start-Stop streaming  - Sensors callbacks API", "[live][using_callbac
     }
 }
 
+
 ////////////////////////////////////////////
 ////// Test basic streaming functionality //
 ////////////////////////////////////////////
@@ -2421,6 +2422,45 @@ TEST_CASE("Connect events works", "[live]") {
     }
 }
 
+TEST_CASE("RGB streaming - HW reset", "[live]")
+{
+    std::cout << "NOHA :: RGB streaming - HW reset " << std::endl;
+    rs2::context ctx;
+    if (make_context(SECTION_FROM_TEST_NAME, &ctx))
+    {
+        for (auto i = 0; i < 30; i++) // 50 HW resets
+        {
+
+            std::vector<rs2::device> list;
+            REQUIRE_NOTHROW(list = ctx.query_devices());
+            REQUIRE(list.size());
+
+            auto dev = list[0];
+            CAPTURE(dev.get_info(RS2_CAMERA_INFO_NAME));
+            disable_sensitive_options_for(dev);
+
+            std::mutex m;
+            int fps = is_usb3(dev) ? 30 : 15; // In USB2 Mode the devices will switch to lower FPS rates
+            std::map<std::string, size_t> frames_per_stream{};
+
+            auto profiles = configure_all_supported_streams(dev, 640, 480, fps);
+
+            for (auto s : profiles.first)
+            {
+                REQUIRE_NOTHROW(s.start([&m, &frames_per_stream](rs2::frame f)
+                    {
+                        std::lock_guard<std::mutex> lock(m);
+                        ++frames_per_stream[f.get_profile().stream_name()];
+                    }));
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+
+            // run HW Reset
+
+        }
+    }
+
+}
 std::shared_ptr<std::function<void(rs2::frame fref)>> check_stream_sanity(const context& ctx, const sensor& sub, int num_of_frames, bool infinite = false)
 {
     std::shared_ptr<std::condition_variable> cv = std::make_shared<std::condition_variable>();
