@@ -2461,6 +2461,80 @@ TEST_CASE("RGB streaming - HW reset", "[live]")
     }
 
 }
+
+TEST_CASE("HW reset functionality", "[live][pipeline][using_pipeline]") {
+
+    std::cout << "NOHA :: HW reset functionality" << std::endl; //"Connect events works"
+    rs2::context ctx;
+    if (make_context(SECTION_FROM_TEST_NAME, &ctx))
+    {
+        for (auto i = 0; i < 20; i++) // 50 HW resets
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            device_list list;
+            REQUIRE_NOTHROW(list = ctx.query_devices());
+
+            auto dev = make_device(list);
+            auto dev_strong = dev.first;
+            auto dev_weak = dev.second;
+
+            std::string serial;
+
+            REQUIRE_NOTHROW(serial = dev_strong->get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+
+            auto disconnected = false;
+            auto connected = false;
+            std::condition_variable cv;
+            std::mutex m;
+
+            //Setting up devices change callback to notify the test about device disconnection and connection
+            REQUIRE_NOTHROW(ctx.set_devices_changed_callback([&, dev_weak](event_information& info) mutable
+                {
+                    auto&& strong = dev_weak.lock();
+                    {
+                        if (strong)
+                        {
+                            if (info.was_removed(*strong))
+                            {
+                                std::unique_lock<std::mutex> lock(m);
+                                disconnected = true;
+                                cv.notify_one();
+                            }
+
+
+                            for (auto d : info.get_new_devices())
+                            {
+                                if (serial == d.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER))
+                                {
+                                    try
+                                    {
+                                        std::unique_lock<std::mutex> lock(m);
+
+                                        reset_device(dev_strong, dev_weak, list, d);
+
+                                        connected = true;
+                                        cv.notify_one();
+                                        break;
+                                    }
+                                    catch (...)
+                                    {
+
+                                    }
+                                }
+                            }
+                        }
+
+                    }}));
+
+            //forcing hardware reset to simulate device disconnection
+            do_with_waiting_for_camera_connection(ctx, dev_strong, serial, [&]()
+                {
+                    dev_strong->hardware_reset();
+                });
+        }
+    }
+
+}
 std::shared_ptr<std::function<void(rs2::frame fref)>> check_stream_sanity(const context& ctx, const sensor& sub, int num_of_frames, bool infinite = false)
 {
     std::shared_ptr<std::condition_variable> cv = std::make_shared<std::condition_variable>();
