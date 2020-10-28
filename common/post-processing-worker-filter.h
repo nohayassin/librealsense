@@ -66,7 +66,10 @@ public:
                     continue;
                 if( !f )
                     continue;
-                // increase refrence count by 1 to make subdevice destructor wait until worker thread is done
+                // increase refrence count by 1 to make subdevice destructor wait until worker thread is done.
+                // if subdevice_model destructor finishes before worker thread is done, it will access undefined memory addresses 
+                // because the device already turned off and memory is no longer available. So it is important to delay the destruction of subdevice_model by using a shared pointer
+                // to keep memory accessible until worker thread is done.
                 if (auto shared_p = weak_p.lock()) 
                 {
                     worker_body(f.as< rs2::frameset >());
