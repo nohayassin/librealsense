@@ -6297,7 +6297,8 @@ namespace rs2
                                         ((friendly_name.find("Tracking") != std::string::npos) ||
                                         (friendly_name.find("Motion") != std::string::npos)))
                                     {
-                                        viewer.synchronization_enable = false;
+                                        //viewer.synchronization_enable = false;
+                                        //viewer.synchronization_enable = true;
                                     }
                                     _update_readonly_options_timer.set_expired();
                                     sub->play(profiles, viewer, dev_syncer);
