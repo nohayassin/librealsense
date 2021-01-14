@@ -12,5 +12,9 @@ namespace librealsense
     public:
         ds5_active(std::shared_ptr<context> ctx,
                    const platform::backend_device_group& group);
+        ~ds5_active()
+        {
+            std::cout << "NOHA :: ~ds5_active()"<<std::endl;
+        }
     };
 }

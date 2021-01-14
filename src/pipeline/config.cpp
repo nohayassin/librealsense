@@ -11,6 +11,12 @@ namespace librealsense
         config::config()
         {
             //empty
+            //std::cout << "NOHA :: config::config()"<<std::endl;
+        }
+        config::~config()
+        {
+            //empty
+            std::cout << "NOHA :: ~config()" << std::endl;
         }
         void config::enable_stream(rs2_stream stream, int index, uint32_t width, uint32_t height, rs2_format format, uint32_t fps)
         {
@@ -93,6 +99,8 @@ namespace librealsense
         std::shared_ptr<profile> config::resolve(std::shared_ptr<device_interface> dev)
         {
             util::config config;
+            _resolved_profile.reset();
+            auto t1 = std::chrono::system_clock::now();
 
             //if the user requested all streams
             if (_enable_all_streams)
@@ -103,29 +111,49 @@ namespace librealsense
                     auto profiles = sub.get_stream_profiles(PROFILE_TAG_SUPERSET);
                     config.enable_streams(profiles);
                 }
+                auto t2 = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                //std::cout << "NOHA ::  config::resolveX (1) : " << diff << " msec" << std::endl;
                 return std::make_shared<profile>(dev, config, _device_request.record_output);
             }
 
             //If the user did not request anything, give it the default, on playback all recorded streams are marked as default.
             if (_stream_requests.empty())
             {
+                auto t1 = std::chrono::system_clock::now();
+
                 auto default_profiles = get_default_configuration(dev);
                 config.enable_streams(default_profiles);
+
+                auto t2 = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                //std::cout << "NOHA ::  config::resolveX (2) : " << diff << " msec" << std::endl;
+
                 return std::make_shared<profile>(dev, config, _device_request.record_output);
             }
 
             //Enabled requested streams
+            t1 = std::chrono::system_clock::now();
             for (auto&& req : _stream_requests)
             {
                 auto r = req.second;
                 config.enable_stream(r.stream, r.index, r.width, r.height, r.format, r.fps);
             }
-            return std::make_shared<profile>(dev, config, _device_request.record_output);
+            
+            auto val =  std::make_shared<profile>(dev, config, _device_request.record_output);
+
+            auto t2 = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  config::resolveX (3) : " << diff << " msec" << std::endl;
+
+            return val;
         }
 
         std::shared_ptr<profile> config::resolve(std::shared_ptr<pipeline> pipe, const std::chrono::milliseconds& timeout)
         {
             std::lock_guard<std::mutex> lock(_mtx);
+
+
             _resolved_profile.reset();
 
             //Resolve the the device that was specified by the user, this call will wait in case the device is not availabe.
@@ -136,6 +164,7 @@ namespace librealsense
                 return _resolved_profile;
             }
 
+            auto t1 = std::chrono::system_clock::now();
             //Look for satisfy device in case the user did not specify one.
             auto devs = pipe->get_context()->query_devices(RS2_PRODUCT_LINE_ANY_INTEL);
             for (auto dev_info : devs)
@@ -143,7 +172,20 @@ namespace librealsense
                 try
                 {
                     auto dev = dev_info->create_device(true);
+
+                    auto t2 = std::chrono::system_clock::now();
+                    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                    //std::cout << "NOHA ::  config::resolve (1) : " << diff << " msec" << std::endl;
+
+
+                    t1 = std::chrono::system_clock::now();
+
                     _resolved_profile = resolve(dev);
+
+                    t2 = std::chrono::system_clock::now();
+                    diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                    std::cout << "NOHA ::  config::resolve (2) : " << diff << " msec" << std::endl;
+
                     return _resolved_profile;
                 }
                 catch (const std::exception& e)
@@ -152,11 +194,17 @@ namespace librealsense
                 }
             }
 
+
+            t1 = std::chrono::system_clock::now();
             //If no device found wait for one
             auto dev = pipe->wait_for_device(timeout);
             if (dev != nullptr)
             {
                 _resolved_profile = resolve(dev);
+
+                auto t2 = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                std::cout << "NOHA ::  config::resolve (3) : " << diff << " msec" << std::endl;
                 return _resolved_profile;
             }
 
@@ -164,7 +212,26 @@ namespace librealsense
 
             assert(0); //Unreachable code
         }
+        void config::unresolve()
+        {
+            /*device_request _device_request;
+            std::map<std::pair<rs2_stream, int>, stream_profile> _stream_requests;
+            std::mutex _mtx;
+            bool _enable_all_streams = false;
+            std::shared_ptr<profile> _resolved_profile;
+            bool _playback_loop;*/
 
+            _resolved_profile.reset();
+
+            /*_device_request.filename.clear();
+            _device_request.record_output.clear();
+            _device_request.serial.clear();
+            _stream_requests.clear();*/
+
+            //_stream_requests.clear();
+            //delete &_device_request;
+
+        }
         bool config::can_resolve(std::shared_ptr<pipeline> pipe)
         {
             try

@@ -167,7 +167,11 @@ namespace librealsense
 
         return s;
     }
+    sensor_base::~sensor_base() {
 
+        std::cout << "NOHA ::  ~sensor_base()" << std::endl;;
+        //environment::get_instance().get_extrinsics_graph().release_streams();
+    }
     void sensor_base::raise_on_before_streaming_changes(bool streaming)
     {
         on_before_streaming_changes(streaming);
@@ -192,9 +196,17 @@ namespace librealsense
 
     stream_profiles sensor_base::get_stream_profiles( int tag ) const
     {
+        auto t1 = std::chrono::system_clock::now();
+
         stream_profiles results;
         bool const need_debug = tag & profile_tag::PROFILE_TAG_DEBUG;
         bool const need_any = tag & profile_tag::PROFILE_TAG_ANY;
+
+        auto t2 = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+        //std::cout << "NOHA ::  get_stream_profiles (0): " << diff << " msec" << std::endl;
+        t1 = std::chrono::system_clock::now();
+
         for( auto p : *_profiles )
         {
             auto curr_tag = p->get_tag();
@@ -205,7 +217,16 @@ namespace librealsense
             {
                 results.push_back( p );
             }
+
+            auto t2 = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  get_stream_profiles (1): " << diff << " msec" << std::endl;
+            //t1 = std::chrono::system_clock::now();
         }
+       // _profiles.reset();
+        t2 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+        //std::cout << "NOHA ::  get_stream_profiles (2): " << diff << " msec" << std::endl;
 
         return results;
     }
@@ -284,6 +305,7 @@ namespace librealsense
 
     uvc_sensor::~uvc_sensor()
     {
+        std::cout<< "NOHA :: ~uvc_sensor()"<<std::endl;
         try
         {
             if (_is_streaming)
@@ -291,6 +313,7 @@ namespace librealsense
 
             if (_is_opened)
                 uvc_sensor::close();
+            //_source.flush();
         }
         catch (...)
         {
@@ -300,6 +323,8 @@ namespace librealsense
 
     void uvc_sensor::open(const stream_profiles& requests)
     {
+        std::cout << "NOHA :: uvc_sensor::open(..)" << std::endl;
+
         std::lock_guard<std::mutex> lock(_configure_lock);
         if (_is_streaming)
             throw wrong_api_call_sequence_exception("open(...) failed. UVC device is streaming!");
@@ -445,16 +470,20 @@ namespace librealsense
 
     void uvc_sensor::close()
     {
+        std::cout << "NOHA :: uvc_sensor::close()" << std::endl;
+
+        //std::cout << "NOHA :: uvc_sensor::close :: (1)" << std::endl;
         std::lock_guard<std::mutex> lock(_configure_lock);
         if (_is_streaming)
             throw wrong_api_call_sequence_exception("close() failed. UVC device is streaming!");
         else if (!_is_opened)
             throw wrong_api_call_sequence_exception("close() failed. UVC device was not opened!");
-
+        //std::cout << "NOHA :: uvc_sensor::close :: (2)" << std::endl;
         for (auto&& profile : _internal_config)
         {
             try // Handle disconnect event
             {
+                std::cout << "NOHA :: uvc_sensor::close :: (3)" << std::endl;
                 _device->close(profile);
             }
             catch (...) {}
@@ -462,20 +491,25 @@ namespace librealsense
         reset_streaming();
         if (Is<librealsense::global_time_interface>(_owner))
         {
+            //std::cout << "NOHA :: uvc_sensor::close :: (4)" << std::endl;
             As<librealsense::global_time_interface>(_owner)->enable_time_diff_keeper(false);
         }
         _power.reset();
         _is_opened = false;
         set_active_streams({});
+        //std::cout << "NOHA :: uvc_sensor::close :: (5)" << std::endl;
     }
 
     void uvc_sensor::register_xu(platform::extension_unit xu)
     {
+        std::cout << "NOHA :: uvc_sensor::register_xu(..)" << std::endl;
         _xus.push_back(std::move(xu));
     }
 
     void uvc_sensor::start(frame_callback_ptr callback)
     {
+        std::cout << "NOHA :: uvc_sensor::start(..)" << std::endl;
+
         std::lock_guard<std::mutex> lock(_configure_lock);
         if (_is_streaming)
             throw wrong_api_call_sequence_exception("start_streaming(...) failed. UVC device is already streaming!");
@@ -490,6 +524,7 @@ namespace librealsense
 
     void uvc_sensor::stop()
     {
+        std::cout << "NOHA :: uvc_sensor::stop()" << std::endl;
         std::lock_guard<std::mutex> lock(_configure_lock);
         if (!_is_streaming)
             throw wrong_api_call_sequence_exception("stop_streaming() failed. UVC device is not streaming!");
@@ -501,6 +536,7 @@ namespace librealsense
 
     void uvc_sensor::reset_streaming()
     {
+        std::cout << "NOHA :: uvc_sensor::reset_streaming()" << std::endl;
         _source.flush();
         _source.reset();
         _timestamp_reader->reset();
@@ -508,6 +544,8 @@ namespace librealsense
 
     void uvc_sensor::acquire_power()
     {
+        //std::cout << "NOHA :: uvc_sensor::acquire_power()" << std::endl;
+
         std::lock_guard<std::mutex> lock(_power_lock);
         if (_user_count.fetch_add(1) == 0)
         {
@@ -534,6 +572,8 @@ namespace librealsense
 
     void uvc_sensor::release_power()
     {
+        //std::cout << "NOHA :: uvc_sensor::release_power()" << std::endl;
+
         std::lock_guard< std::mutex > lock( _power_lock );
         if( _user_count.fetch_add( -1 ) == 1 )
         {
@@ -556,6 +596,9 @@ namespace librealsense
 
     stream_profiles uvc_sensor::init_stream_profiles()
     {
+        std::cout << "NOHA :: uvc_sensor::init_stream_profiles()" << std::endl;
+
+        auto t1 = std::chrono::system_clock::now();
         std::unordered_set<std::shared_ptr<video_stream_profile>> profiles;
         power on(std::dynamic_pointer_cast<uvc_sensor>(shared_from_this()));
 
@@ -568,6 +611,8 @@ namespace librealsense
                 continue;
 
             auto&& profile = std::make_shared<video_stream_profile>(p);
+            //auto&& pp = std::weak_ptr<video_stream_profile>(p);
+            //auto pp = std::weak_ptr<const stream_interface>(sp);
             profile->set_dims(p.width, p.height);
             profile->set_stream_type(fourcc_to_rs2_stream(p.format));
             profile->set_stream_index(0);
@@ -577,11 +622,18 @@ namespace librealsense
         }
 
         stream_profiles result{ profiles.begin(), profiles.end() };
+
+        auto t2 = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+        //std::cout << "NOHA ::  uvc_sensor::init_stream_profiles (1): " << diff << " msec" << std::endl;
+
         return result;
     }
 
     rs2_extension uvc_sensor::stream_to_frame_types(rs2_stream stream) const
     {
+        //std::cout << "NOHA :: uvc_sensor::stream_to_frame_types()" << std::endl;
+
         // TODO: explicitly return video_frame for relevant streams and default to an error?
         switch (stream)
         {
@@ -685,6 +737,7 @@ namespace librealsense
 
     hid_sensor::~hid_sensor()
     {
+        std::cout << "NOHA :: ~hid_sensor()" << std::endl;
         try
         {
             if (_is_streaming)
@@ -941,6 +994,7 @@ namespace librealsense
         _user_count(0),
         _timestamp_reader(std::move(timestamp_reader))
     {
+        std::cout << "NOHA :: uvc_sensor::uvc_sensor()"<<std::endl;
         register_metadata(RS2_FRAME_METADATA_BACKEND_TIMESTAMP, make_additional_data_parser(&frame_additional_data::backend_timestamp));
         register_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE, make_additional_data_parser(&frame_additional_data::raw_size));
     }
@@ -1036,17 +1090,27 @@ namespace librealsense
         : sensor_base(name, device, (recommended_proccesing_blocks_interface*)this), _raw_sensor(std::move(sensor))
     {
         // synthetic sensor and its raw sensor will share the formats and streams mapping
+        //std::cout << "NOHA :: (1) synthetic_sensor() :: _raw_sensor.unique():: _raw_sensor.use_count() = " << _raw_sensor.use_count() << std::endl;
         auto& raw_fourcc_to_rs2_format_map = _raw_sensor->get_fourcc_to_rs2_format_map();
         _fourcc_to_rs2_format = std::make_shared<std::map<uint32_t, rs2_format>>(fourcc_to_rs2_format_map);
         raw_fourcc_to_rs2_format_map = _fourcc_to_rs2_format;
-
+        //std::cout << "NOHA :: (2) synthetic_sensor() :: _raw_sensor.unique():: _raw_sensor.use_count() = " << _raw_sensor.use_count() << std::endl;
         auto& raw_fourcc_to_rs2_stream_map = _raw_sensor->get_fourcc_to_rs2_stream_map();
         _fourcc_to_rs2_stream = std::make_shared<std::map<uint32_t, rs2_stream>>(fourcc_to_rs2_stream_map);
         raw_fourcc_to_rs2_stream_map = _fourcc_to_rs2_stream;
+        //std::cout << "NOHA :: (3) synthetic_sensor() :: _raw_sensor.unique():: _raw_sensor.use_count() = " << _raw_sensor.use_count() << std::endl;
     }
 
     synthetic_sensor::~synthetic_sensor()
     {
+        if (_raw_sensor.unique())
+        {
+            std::cout << "NOHA :: ~synthetic_sensor() :: _raw_sensor.unique():: _raw_sensor.use_count() = " << _raw_sensor.use_count() << std::endl;
+        }
+        else {
+            std::cout << "NOHA :: ~synthetic_sensor() :: NOT _raw_sensor.unique() :: _raw_sensor.use_count() = " << _raw_sensor.use_count() <<std::endl;
+        }
+        std::cout << "NOHA :: ~synthetic_sensor() :: _raw_sensor = "<< _raw_sensor <<std::endl;
         try
         {
             if (is_streaming())
@@ -1059,11 +1123,13 @@ namespace librealsense
         {
             LOG_ERROR("An error has occurred while stop_streaming()!");
         }
+       // _raw_sensor.reset();
     }
 
     // Register the option to both raw sensor and synthetic sensor.
     void synthetic_sensor::register_option(rs2_option id, std::shared_ptr<option> option)
     {
+        //std::cout << "NOHA :: synthetic_sensor::register_option(..) :: _raw_sensor.use_count()"<< _raw_sensor.use_count()<<std::endl;
         _raw_sensor->register_option(id, option);
         sensor_base::register_option(id, option);
     }
@@ -1120,14 +1186,21 @@ namespace librealsense
 
     void synthetic_sensor::register_pu(rs2_option id)
     {
+        //std::cout << "NOHA :: (1) synthetic_sensor::register_pu :: _raw_sensor.lock().use_count() = " << _raw_sensor.lock().use_count() << std::endl;
         const auto&& raw_uvc_sensor = As<uvc_sensor, sensor_base>(_raw_sensor);
         register_option(id, std::make_shared<uvc_pu_option>(*raw_uvc_sensor.get(), id));
+        //std::cout << "NOHA :: (2) synthetic_sensor::register_pu :: _raw_sensor.lock().use_count() = " << _raw_sensor.lock().use_count() << std::endl;
     }
 
     bool synthetic_sensor::try_register_pu(rs2_option id)
     {
+        //std::cout << "NOHA :: (1) synthetic_sensor::try_register_pu :: _raw_sensor.use_count() = " << _raw_sensor.lock().use_count() << std::endl;
         const auto&& raw_uvc_sensor = As<uvc_sensor, sensor_base>(_raw_sensor);
-        return try_register_option(id, std::make_shared<uvc_pu_option>(*raw_uvc_sensor.get(), id));
+        auto val =  try_register_option(id, std::make_shared<uvc_pu_option>(*raw_uvc_sensor.get(), id));
+
+        //std::cout << "NOHA :: (2) synthetic_sensor::try_register_pu :: _raw_sensor.use_count() = " << _raw_sensor.lock().use_count() << std::endl;
+
+        return val;
     }
 
     void synthetic_sensor::sort_profiles(stream_profiles* profiles)
@@ -1150,6 +1223,8 @@ namespace librealsense
 
     std::shared_ptr<stream_profile_interface> synthetic_sensor::clone_profile(const std::shared_ptr<stream_profile_interface>& profile)
     {
+        auto t000 = std::chrono::system_clock::now();
+        auto t0 = std::chrono::system_clock::now();
         auto cloned = std::make_shared<stream_profile_base>(platform::stream_profile{});
 
         if (auto vsp = std::dynamic_pointer_cast<video_stream_profile>(profile))
@@ -1163,13 +1238,31 @@ namespace librealsense
             cloned = std::make_shared<motion_stream_profile>(platform::stream_profile{});
         }
 
+        auto t1 = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+        //std::cout << "NOHA ::  synthetic_sensor::clone_profile (!!!! 1 !!!!!!) : " << diff << " usec" << std::endl;
+        t0 = std::chrono::system_clock::now();
+
         assign_stream(profile, cloned);
+
+        t1 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+        //std::cout << "NOHA ::  synthetic_sensor::clone_profile (!!!! 2 !!!!!!) : " << diff << " usec" << std::endl;
+        t0 = std::chrono::system_clock::now();
+
         cloned->set_unique_id(profile->get_unique_id());
         cloned->set_format(profile->get_format());
         cloned->set_stream_index(profile->get_stream_index());
         cloned->set_stream_type(profile->get_stream_type());
         cloned->set_framerate(profile->get_framerate());
 
+        t1 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+        //std::cout << "NOHA ::  synthetic_sensor::clone_profile (!!!! 3 !!!!!!) : " << diff << " usec" << std::endl;
+
+        auto t111 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::microseconds>(t111 - t000).count();
+        //std::cout << "NOHA ::  synthetic_sensor::clone_profile (!!!! TOTAL !!!!!!) : " << diff << " usec" << std::endl;
         return cloned;
     }
 
@@ -1219,40 +1312,86 @@ namespace librealsense
 
     stream_profiles synthetic_sensor::init_stream_profiles()
     {
+        auto t11 = std::chrono::system_clock::now();
+
         stream_profiles result_profiles;
         auto profiles = _raw_sensor->get_stream_profiles( PROFILE_TAG_ANY | PROFILE_TAG_DEBUG );
+        auto profiles_size = profiles.size();
+        //std::vector<std::shared_ptr<stream_profile_interface>> cloned_profiles;
+        //cloned_profiles.resize(profiles_size);
 
+        
+        auto t2 = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t11).count();
+        //std::cout << "NOHA ::  synthetic_sensor::init_stream_profiles (1) : " << diff << " msec" << std::endl;
+        
+        _pbf_supported_profiles.clear();
+        _source_to_target_profiles_map.clear();
+        _target_to_source_profiles_map.clear();
+
+        t11 = std::chrono::system_clock::now();
         for (auto&& pbf : _pb_factories)
         {
+
+            auto t1 = std::chrono::system_clock::now();
+
             const auto&& sources = pbf->get_source_info();
             const auto&& targets = pbf->get_target_info();
 
+            auto t2 = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  synthetic_sensor::init_stream_profiles (2) : " << diff << " msec" << std::endl;
+
             for (auto&& source : sources)
             {
+
                 // add profiles that are supported by the device
                 for (auto& profile : profiles)
                 {
+                    
                     if (profile->get_format() == source.format &&
                         (source.stream == profile->get_stream_type() || source.stream == RS2_STREAM_ANY))
                     {
+                        auto t00 = std::chrono::system_clock::now();
+                        auto&& cloned_profile = clone_profile(profile);
+                        //auto fps = profile->get_framerate();;
+                        
+
+                        auto t4 = std::chrono::system_clock::now();
+                        diff = std::chrono::duration_cast<std::chrono::microseconds>(t4 - t00).count();
+                        //std::cout << "NOHA ::  synthetic_sensor::init_stream_profiles (YYY) : " << diff << " usec" << std::endl;
+                        t00 = std::chrono::system_clock::now();
+
+
+                        auto&& cloned_vsp = As<video_stream_profile, stream_profile_interface>(cloned_profile);
+
+                        t4 = std::chrono::system_clock::now();
+                        diff = std::chrono::duration_cast<std::chrono::microseconds>(t4 - t00).count();
+                        //std::cout << "NOHA ::  synthetic_sensor::init_stream_profiles (XXX) : " << diff << " usec" << std::endl;
+                        //t00 = std::chrono::system_clock::now();
+
                         for (auto target : targets)
                         {
+                            
                             target.fps = profile->get_framerate();
 
-                            auto&& cloned_profile = clone_profile(profile);
+                            //auto&& cloned_profile = clone_profile(profile);
                             cloned_profile->set_format(target.format);
                             cloned_profile->set_stream_index(target.index);
                             cloned_profile->set_stream_type(target.stream);
 
-                            auto&& cloned_vsp = As<video_stream_profile, stream_profile_interface>(cloned_profile);
+                            //auto&& cloned_vsp = As<video_stream_profile, stream_profile_interface>(cloned_profile);
                             if (cloned_vsp)
                             {
                                 const auto&& res = target.stream_resolution({ cloned_vsp->get_width(), cloned_vsp->get_height() });
                                 target.height = res.height;
                                 target.width = res.width;
                                 cloned_vsp->set_dims(target.width, target.height);
+
                             }
 
+                            
+                            auto t0 = std::chrono::system_clock::now();
                             // Add the cloned profile to the supported profiles by this processing block factory,
                             // for later processing validation in resolving the request.
                             _pbf_supported_profiles[pbf.get()].push_back(cloned_profile);
@@ -1261,6 +1400,11 @@ namespace librealsense
                             _source_to_target_profiles_map[profile].push_back(cloned_profile);
                             // cache each target profile to its source profiles which were generated from.
                             _target_to_source_profiles_map[target].push_back(profile);
+
+
+                            auto t3 = std::chrono::system_clock::now();
+                            diff = std::chrono::duration_cast<std::chrono::microseconds>(t3 - t0).count();
+                            //std::cout << "NOHA ::  synthetic_sensor::init_stream_profiles (000) : " << diff << " usec" << std::endl;
 
                             // disregard duplicated from profiles list
                             if (is_duplicated_profile(cloned_profile, result_profiles))
@@ -1272,14 +1416,32 @@ namespace librealsense
                                 continue;
 
                             result_profiles.push_back(cloned_profile);
+
+                           
+                            
                         }
+
+                       
                     }
-                }
+
+                    //profile.reset();
+                }  
             }
         }
+        //stop();
+        t2 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t11).count();
+        std::cout << "NOHA ::  synthetic_sensor::init_stream_profiles (2) : " << diff << " usec" << std::endl;
+        t11 = std::chrono::system_clock::now();
 
         _owner->tag_profiles(result_profiles);
         sort_profiles(&result_profiles);
+
+        t2 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t11).count();
+        //std::cout << "NOHA ::  synthetic_sensor::init_stream_profiles (2) : " << diff << " msec" << std::endl;
+        t11 = std::chrono::system_clock::now();
+
         return result_profiles;
     }
 
@@ -1446,17 +1608,36 @@ namespace librealsense
 
     void synthetic_sensor::close()
     {
+        std::cout << "NOHA :: synthetic_sensor::close :: (1)"<<std::endl;
         std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
         _raw_sensor->close();
         for (auto&& entry : _profiles_to_processing_block)
         {
             for (auto&& pb : entry.second)
+            {
+                std::cout << "NOHA :: synthetic_sensor::close :: (2)" << std::endl;
                 unregister_processing_block_options(*pb);
+            }
         }
         _profiles_to_processing_block.erase(begin(_profiles_to_processing_block), end(_profiles_to_processing_block));
         _cached_requests.erase(_cached_requests.begin(), _cached_requests.end());
         set_active_streams({});
         _post_process_callback.reset();
+
+        /*_pb_factories.erase(_pb_factories.begin(), _pb_factories.end()); // NOHA ADDED
+        _cached_processing_blocks_options.erase(_cached_processing_blocks_options.begin(), _cached_processing_blocks_options.end());
+        _target_to_source_profiles_map.erase(_target_to_source_profiles_map.begin(), _target_to_source_profiles_map.end());
+        _target_to_source_profiles_map.erase(_target_to_source_profiles_map.begin(), _target_to_source_profiles_map.end());
+        _pbf_supported_profiles.erase(_pbf_supported_profiles.begin(), _pbf_supported_profiles.end());*/
+        /*frame_callback_ptr _post_process_callback;
+        std::shared_ptr<sensor_base> _raw_sensor;
+        std::vector<std::shared_ptr<processing_block_factory>> _pb_factories;
+        std::unordered_map<processing_block_factory*, stream_profiles> _pbf_supported_profiles;
+        std::unordered_map<std::shared_ptr<stream_profile_interface>, std::unordered_set<std::shared_ptr<processing_block>>> _profiles_to_processing_block;
+        std::unordered_map<std::shared_ptr<stream_profile_interface>, stream_profiles> _source_to_target_profiles_map;
+        std::unordered_map<stream_profile, stream_profiles> _target_to_source_profiles_map;
+        std::unordered_map<rs2_format, stream_profiles> _cached_requests;
+        std::vector<rs2_option> _cached_processing_blocks_options;*/
     }
 
     template<class T>

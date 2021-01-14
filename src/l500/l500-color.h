@@ -64,6 +64,10 @@ namespace librealsense
             _state(sensor_state::CLOSED)
         {
         }
+        ~l500_color_sensor()
+        {
+            std::cout << "NOHA :: ~l500_color_sensor()"<<std::endl;
+        }
         rs2_intrinsics get_raw_intrinsics( uint32_t width, uint32_t height ) const;
 
         rs2_intrinsics get_intrinsics( const stream_profile& profile ) const override;
@@ -82,6 +86,7 @@ namespace librealsense
 
         stream_profiles init_stream_profiles() override
         {
+            std::cout << "NOHA :: l500-color::init_stream_profiles()"<<std::endl;
             auto lock = environment::get_instance().get_extrinsics_graph().lock();
 
             auto&& results = synthetic_sensor::init_stream_profiles();

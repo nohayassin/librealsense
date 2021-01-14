@@ -871,6 +871,8 @@ namespace librealsense
 
         void wmf_uvc_device::foreach_profile(std::function<void(const mf_profile& profile, CComPtr<IMFMediaType> media_type, bool& quit)> action) const
         {
+            auto t1 = std::chrono::system_clock::now();
+
             bool quit = false;
             CComPtr<IMFMediaType> pMediaType = nullptr;
             for (unsigned int sIndex = 0; sIndex < _streams.size(); ++sIndex)
@@ -928,15 +930,24 @@ namespace librealsense
 
                     safe_release(pMediaType);
 
+                    
+
                     if (quit)
                         return;
                 }
             }
+
+            auto t2 = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  wmf_uvc_device::foreach_profile (1): " << diff << " msec" << std::endl;
         }
 
         std::vector<stream_profile> wmf_uvc_device::get_profiles() const
         {
+            auto t1 = std::chrono::system_clock::now();
             check_connection();
+
+            
 
             if (get_power_state() != D0)
                 throw std::runtime_error("Device must be powered to query supported profiles!");
@@ -947,6 +958,9 @@ namespace librealsense
                 results.push_back(mfp.profile);
             });
 
+            auto t2 = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  wmf_uvc_device::get_profiles (1): " << diff << " msec" << std::endl;
             return results;
         }
 
@@ -1114,22 +1128,25 @@ namespace librealsense
             _is_started = false;
 
             check_connection();
-
+            std::cout << "NOHA :: wmf_uvc_device::close :: (1)" << std::endl;
             auto& elem = std::find_if(_streams.begin(), _streams.end(),
                 [&](const profile_and_callback& pac) {
+                    std::cout << "NOHA :: wmf_uvc_device::close :: (2)" << std::endl;
                 return (pac.profile == profile && (pac.callback));
             });
 
             if (elem == _streams.end() && _frame_callbacks.empty())
                 throw std::runtime_error("Camera is not streaming!");
-
+            std::cout << "NOHA :: wmf_uvc_device::close :: (3)" << std::endl;
             if (elem != _streams.end())
             {
                 try {
+                    std::cout << "NOHA :: wmf_uvc_device::close :: (4)" << std::endl;
                     flush(int(elem - _streams.begin()));
                 }
                 catch (...)
                 {
+                    std::cout << "NOHA :: wmf_uvc_device::close :: (5)" << std::endl;
                     stop_stream_cleanup(profile, elem); // TODO: move to RAII
                     throw;
                 }

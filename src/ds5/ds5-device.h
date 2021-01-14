@@ -44,13 +44,22 @@ namespace librealsense
 
         uvc_sensor& get_raw_depth_sensor()
         {
+            
             synthetic_sensor& depth_sensor = get_depth_sensor();
-            return dynamic_cast<uvc_sensor&>(*depth_sensor.get_raw_sensor());
+            
+            auto& val =  dynamic_cast<uvc_sensor&>(*depth_sensor.get_raw_sensor());
+            //std::cout << "NOHA :: (1) synthetic_sensor() :: _raw_sensor.unique():: depth_sensor.use_count() = " << val.unique() << std::endl;
+            return val;
         }
 
         ds5_device(std::shared_ptr<context> ctx,
                    const platform::backend_device_group& group);
 
+        ~ds5_device();
+        /*{
+            std::cout <<"NOHA :: ~ds5_device()" <<std::endl;
+            environment::get_instance().get_extrinsics_graph().release_streams();
+        }*/
         std::vector<uint8_t> send_receive_raw_data(const std::vector<uint8_t>& input) override;
 
         void hardware_reset() override;
@@ -100,6 +109,8 @@ namespace librealsense
         std::shared_ptr<polling_error_handler> _polling_error_handler;
         std::shared_ptr<lazy<rs2_extrinsics>> _left_right_extrinsics;
         bool _is_locked = true;
+
+        //std::shared_ptr<uvc_sensor> _uvc_sensor;
     };
 
     class ds5u_device : public ds5_device

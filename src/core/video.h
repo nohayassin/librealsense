@@ -12,6 +12,10 @@ namespace librealsense
     {
     public:
         virtual rs2_intrinsics get_intrinsics(const stream_profile& profile) const = 0;
+        ~video_sensor_interface()
+        {
+            std::cout << "NOHA :: ~video_sensor_interface()"<<std::endl;
+        }
     };
 
     class video_stream_profile_interface : public virtual stream_profile_interface

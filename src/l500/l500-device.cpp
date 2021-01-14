@@ -141,6 +141,7 @@ namespace librealsense
     std::shared_ptr<synthetic_sensor> l500_device::create_depth_device( std::shared_ptr<context> ctx,
         const std::vector<platform::uvc_device_info>& all_device_infos )
     {
+        std::cout << "NOHA :: l500_device::create_depth_device()" << std::endl;
         auto&& backend = ctx->get_backend();
 
         std::vector<std::shared_ptr<platform::uvc_device>> depth_devices;
@@ -149,8 +150,10 @@ namespace librealsense
 
         std::unique_ptr<frame_timestamp_reader> timestamp_reader_metadata( new l500_timestamp_reader_from_metadata( backend.create_time_service() ) );
         auto enable_global_time_option = std::shared_ptr<global_time_option>( new global_time_option() );
-        auto raw_depth_ep = std::make_shared<uvc_sensor>( "Raw Depth Sensor", std::make_shared<platform::multi_pins_uvc_device>( depth_devices ),
-            std::unique_ptr<frame_timestamp_reader>( new global_timestamp_reader( std::move( timestamp_reader_metadata ), _tf_keeper, enable_global_time_option ) ), this );
+        auto raw_depth_ep = std::make_shared<uvc_sensor>( "Raw Depth Sensor", 
+            std::make_shared<platform::multi_pins_uvc_device>( depth_devices ),
+            std::unique_ptr<frame_timestamp_reader>( new global_timestamp_reader( std::move( timestamp_reader_metadata ), 
+                _tf_keeper, enable_global_time_option ) ), this );
         raw_depth_ep->register_xu( depth_xu );
 
         auto depth_ep = std::make_shared<l500_depth_sensor>( this, raw_depth_ep, l500_depth_fourcc_to_rs2_format, l500_depth_fourcc_to_rs2_stream );

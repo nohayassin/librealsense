@@ -48,7 +48,7 @@ namespace librealsense
         explicit sensor_base(std::string name,
                              device* device, 
                              recommended_proccesing_blocks_interface* owner);
-        virtual ~sensor_base() override { _source.flush(); }
+        virtual ~sensor_base();
 
         void set_source_owner(sensor_base* owner); // will direct the source to the top in the source hierarchy.
         virtual stream_profiles init_stream_profiles() = 0;
@@ -110,6 +110,7 @@ namespace librealsense
         frame_source _source;
         device* _owner;
         std::vector<platform::stream_profile> _uvc_profiles;
+        //std::shared_ptr<uvc_sensor> _uvc_sensor;
 
         std::shared_ptr<std::map<uint32_t, rs2_format>> _fourcc_to_rs2_format;
         std::shared_ptr<std::map<uint32_t, rs2_stream>> _fourcc_to_rs2_stream;
@@ -216,6 +217,7 @@ namespace librealsense
         void register_processing_block(const std::vector<processing_block_factory>& pbfs);
 
         std::shared_ptr<sensor_base> get_raw_sensor() const { return _raw_sensor; };
+        int  get_raw_sensor_counter() { return _raw_sensor.use_count(); };
         frame_callback_ptr get_frames_callback() const override;
         void set_frames_callback(frame_callback_ptr callback) override;
         void register_notifications_callback(notifications_callback_ptr callback) override;
@@ -243,6 +245,7 @@ namespace librealsense
 
         frame_callback_ptr _post_process_callback;
         std::shared_ptr<sensor_base> _raw_sensor;
+        //std::weak_ptr<sensor_base> _raw_sensor;
         std::vector<std::shared_ptr<processing_block_factory>> _pb_factories;
         std::unordered_map<processing_block_factory*, stream_profiles> _pbf_supported_profiles;
         std::unordered_map<std::shared_ptr<stream_profile_interface>, std::unordered_set<std::shared_ptr<processing_block>>> _profiles_to_processing_block;
@@ -346,15 +349,16 @@ namespace librealsense
             power on(std::dynamic_pointer_cast<uvc_sensor>(shared_from_this()));
             return action(*_device);
         }
-
+        void reset_streaming();
     protected:
         stream_profiles init_stream_profiles() override;
         rs2_extension stream_to_frame_types(rs2_stream stream) const;
+        
 
     private:
         void acquire_power();
         void release_power();
-        void reset_streaming();
+        
 
         struct power
         {

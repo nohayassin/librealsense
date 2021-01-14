@@ -47,7 +47,10 @@ namespace librealsense
         {
             _roi_method = roi_method;
         }
-
+        ~roi_sensor_base()
+        {
+            std::cout << "NOHA :: ~roi_sensor_base()" << std::endl;
+        }
     private:
         std::shared_ptr<region_of_interest_method> _roi_method = nullptr;
     };

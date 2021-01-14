@@ -33,6 +33,7 @@ namespace librealsense
 
     std::shared_ptr<synthetic_sensor> l500_color::create_color_device(std::shared_ptr<context> ctx, const std::vector<platform::uvc_device_info>& color_devices_info)
     {
+        std::cout << "NOHA :: l500_color::create_color_device()" << std::endl;
         auto&& backend = ctx->get_backend();
 
         std::unique_ptr<frame_timestamp_reader> timestamp_reader_metadata(new ivcam2::l500_timestamp_reader_from_metadata(backend.create_time_service()));

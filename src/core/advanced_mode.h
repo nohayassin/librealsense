@@ -108,7 +108,10 @@ namespace librealsense
     public:
         explicit ds5_advanced_mode_base(std::shared_ptr<hw_monitor> hwm,
             synthetic_sensor& depth_sensor);
-
+        /*~ds5_advanced_mode_base()
+        {
+            std::cout << "NOHA :: ~ds5_advanced_mode_base()"<<std::endl;
+        }*/
         void create_snapshot(std::shared_ptr<ds5_advanced_mode_interface>& snapshot) const override {};
         void enable_recording(std::function<void(const ds5_advanced_mode_interface&)> recording_function) override {};
 

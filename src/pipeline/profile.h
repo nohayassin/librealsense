@@ -14,8 +14,13 @@ namespace librealsense
         public:
             profile(std::shared_ptr<device_interface> dev, util::config config, const std::string& file = "");
             std::shared_ptr<device_interface> get_device();
+            void reset_device();
             stream_profiles get_active_streams() const;
             util::config::multistream _multistream;
+            ~profile()  {
+                std::cout << "NOHA ::  ~profile()" << std::endl;
+                //_dev.reset();
+            }
         private:
             std::shared_ptr<device_interface> _dev;
             std::string _to_file;

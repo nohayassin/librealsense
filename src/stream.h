@@ -93,11 +93,17 @@ namespace librealsense
     public:
         explicit video_stream_profile(platform::stream_profile sp)
             : stream_profile_base(std::move(sp)),
-              _calc_intrinsics([]() -> rs2_intrinsics { throw not_implemented_exception("No intrinsics are available for this stream profile!"); }),
+              _calc_intrinsics([]() -> rs2_intrinsics { 
+                                std::cout << "NOHA :: video_stream_profile " << std::endl; 
+                                                        throw not_implemented_exception("No intrinsics are available for this stream profile!"); }),
               _width(0), _height(0)
         {
+            //std::cout << "NOHA :: video_stream_profile "<<std::endl;
         }
-
+        ~video_stream_profile()
+        {
+            //std::cout << "NOHA :: ~video_stream_profile " << std::endl;
+        }
         rs2_intrinsics get_intrinsics() const override { return _calc_intrinsics(); }
         void set_intrinsics(std::function<rs2_intrinsics()> calc) override { _calc_intrinsics = calc; }
 

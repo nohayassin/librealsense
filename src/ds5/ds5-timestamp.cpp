@@ -18,9 +18,20 @@ namespace librealsense
     ds5_timestamp_reader_from_metadata::ds5_timestamp_reader_from_metadata(std::unique_ptr<frame_timestamp_reader> backup_timestamp_reader)
         :_backup_timestamp_reader(std::move(backup_timestamp_reader)), _has_metadata(pins), one_time_note(false)
     {
+        std::cout << "NOHA :: ds5_timestamp_reader_from_metadata()"<<std::endl;
+        reset();
+    }
+    /*l500_timestamp_reader_from_metadata(std::shared_ptr<platform::time_service> ts) :_backup_timestamp_reader(nullptr), one_time_note(false)
+    {
+        _backup_timestamp_reader = std::unique_ptr<l500_timestamp_reader>(new l500_timestamp_reader(ts));
         reset();
     }
 
+    ds5_timestamp_reader_from_metadata::ds5_timestamp_reader_from_metadata(std::unique_ptr<frame_timestamp_reader> backup_timestamp_reader)
+        :_backup_timestamp_reader(std::move(backup_timestamp_reader)), _has_metadata(pins), one_time_note(false)
+    {
+        reset();
+    }*/
     bool ds5_timestamp_reader_from_metadata::has_metadata(const std::shared_ptr<frame_interface>& frame)
     {
         std::lock_guard<std::recursive_mutex> lock(_mtx);

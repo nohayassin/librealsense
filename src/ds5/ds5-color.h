@@ -20,6 +20,10 @@ namespace librealsense
         ds5_color(std::shared_ptr<context> ctx,
                   const platform::backend_device_group& group);
 
+        ~ds5_color()
+        {
+            std::cout << "NOHA :: ~ds5_color()" << std::endl;
+        }
     protected:
         std::shared_ptr<stream_interface> _color_stream;
 
@@ -47,7 +51,10 @@ namespace librealsense
             : synthetic_sensor("RGB Camera", uvc_sensor, owner, ds5_color_fourcc_to_rs2_format, ds5_color_fourcc_to_rs2_stream),
             _owner(owner)
         {}
-
+        ~ds5_color_sensor()
+        {
+            std::cout << "NOHA :: ~ds5_color_sensor()"<<std::endl;
+        }
         rs2_intrinsics get_intrinsics(const stream_profile& profile) const override;
         stream_profiles init_stream_profiles() override;
         processing_blocks get_recommended_processing_blocks() const override;

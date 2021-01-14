@@ -629,7 +629,10 @@ namespace librealsense
         {
             check_and_restore_rgb_stream_extrinsic();
         }
-
+        ~rs435i_device()
+        {
+            std::cout << "NOHA :: ~rs435i_device()"<<std::endl;
+        }
         std::shared_ptr<matcher> create_matcher(const frame_holder& frame) const override;
 
         std::vector<tagged_profile> get_profiles_tags() const override

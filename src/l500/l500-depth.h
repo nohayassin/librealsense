@@ -173,6 +173,7 @@ namespace librealsense
 
         stream_profiles init_stream_profiles() override
         {
+            std::cout << "NOHA :: l500-depth::init_stream_profiles()" << std::endl;
             auto lock = environment::get_instance().get_extrinsics_graph().lock();
 
             auto&& results = synthetic_sensor::init_stream_profiles();

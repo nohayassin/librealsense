@@ -137,6 +137,7 @@ namespace librealsense
 
     std::vector<uint8_t> ds5_device::backup_flash(update_progress_callback_ptr callback)
     {
+        std::cout <<"NOHA :: ds5_device::backup_flash(1) " <<std::endl;
         int flash_size = 1024 * 2048;
         int max_bulk_size = 1016;
         int max_iterations = int(flash_size / max_bulk_size + 1);
@@ -148,6 +149,7 @@ namespace librealsense
         uvc_sensor& raw_depth_sensor = get_raw_depth_sensor();
         raw_depth_sensor.invoke_powered([&](platform::uvc_device& dev)
         {
+                std::cout << "NOHA :: ds5_device::backup_flash(2) " << std::endl;
             for (int i = 0; i < max_iterations; i++)
             {
                 int offset = max_bulk_size * i;
@@ -301,10 +303,22 @@ namespace librealsense
             std::shared_ptr<uvc_sensor> uvc_sensor)
             : synthetic_sensor(ds::DEPTH_STEREO, uvc_sensor, owner, ds5_depth_fourcc_to_rs2_format, ds5_depth_fourcc_to_rs2_stream),
             _owner(owner),
-            _depth_units(-1),
-            _hdr_cfg(nullptr)
-        { }
+            _depth_units(-1)//,
+            // _hdr_cfg(nullptr)
+           // _hdr_cfg.lock()(nullptr);// (std::weak_ptr<hdr_config>((nullptr)))
+        {
+            //_uvc_sensor = std::move(uvc_sensor);
+            _hdr_cfg.lock() = nullptr;
+        }
 
+        ~ds5_depth_sensor()
+        {
+            //_uvc_sensor;// .reset_streaming()
+            //_hdr_cfg.reset();
+            std::cout << "NOHA :: ~ds5_depth_sensor() "<<std::endl;
+            std::cout << "NOHA :: ~ds5_depth_sensor() :: _hdr_cfg.use_count() = " << _hdr_cfg.use_count()<< std::endl;
+            
+        }
         processing_blocks get_recommended_processing_blocks() const override
         {
             return get_ds5_depth_recommended_proccesing_blocks();
@@ -334,7 +348,7 @@ namespace librealsense
             synthetic_sensor::open(requests);
 
             // needed in order to restore the HDR sub-preset when streaming is turned off and on
-            if (_hdr_cfg && _hdr_cfg->is_enabled())
+            if (_hdr_cfg.lock() && _hdr_cfg.lock()->is_enabled())
                 get_option(RS2_OPTION_HDR_ENABLED).set(1.f);
         }
 
@@ -347,12 +361,28 @@ namespace librealsense
         */
         stream_profiles init_stream_profiles() override
         {
+            std::cout << "NOHA ::  ds5_device :: init_stream_profiles () : " << std::endl;
+            auto t1 = std::chrono::system_clock::now();
+
             auto lock = environment::get_instance().get_extrinsics_graph().lock();
+
+
+            auto t2 = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  ds5_device :: init_stream_profiles (0) : " << diff << " msec" << std::endl;
+            t1 = std::chrono::system_clock::now();
 
             auto&& results = synthetic_sensor::init_stream_profiles();
 
+            t2 = std::chrono::system_clock::now();
+            diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  ds5_device :: init_stream_profiles (1) : " << diff << " msec" << std::endl;
+            t1 = std::chrono::system_clock::now();
+
             for (auto&& p : results)
             {
+                auto t0 = std::chrono::system_clock::now();
+
                 // Register stream types
                 if (p->get_stream_type() == RS2_STREAM_DEPTH)
                 {
@@ -367,6 +397,11 @@ namespace librealsense
                     assign_stream(_owner->_right_ir_stream, p);
                 }
                 auto&& vid_profile = dynamic_cast<video_stream_profile_interface*>(p.get());
+
+                t2 = std::chrono::system_clock::now();
+                diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0).count();
+                //std::cout << "NOHA ::  ds5_device :: init_stream_profiles (2) : " << diff << " msec" << std::endl;
+                t0 = std::chrono::system_clock::now();
 
                 // Register intrinsics
                 if (p->get_format() != RS2_FORMAT_Y16) // Y16 format indicate unrectified images, no intrinsics are available for these
@@ -383,7 +418,16 @@ namespace librealsense
                             return rs2_intrinsics{};
                     });
                 }
+
+                t2 = std::chrono::system_clock::now();
+                diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0).count();
+                //std::cout << "NOHA ::  ds5_device :: init_stream_profiles (3) : " << diff << " msec" << std::endl;
+ 
             }
+
+            t2 = std::chrono::system_clock::now();
+            diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  ds5_device :: init_stream_profiles (2) : " << diff << " msec" << std::endl;
 
             return results;
         }
@@ -399,12 +443,25 @@ namespace librealsense
 
         void init_hdr_config(const option_range& exposure_range, const option_range& gain_range)
         {
-            _hdr_cfg = std::make_shared<hdr_config>(*(_owner->_hw_monitor), get_raw_sensor(),
+            //std::cout << "NOHA :: (1) init_hdr_config :: get_raw_sensor_counter = " << get_raw_sensor_counter() << std::endl;
+            std::weak_ptr<sensor_base> vall = get_raw_sensor();
+            /*_hdr_cfg = std::make_shared<hdr_config>(*(_owner->_hw_monitor), get_raw_sensor(),
+                exposure_range, gain_range);*/
+            //std::cout << "NOHA :: (2) init_hdr_config :: get_raw_sensor_counter = " << get_raw_sensor_counter() << std::endl;
+            //std::cout << "NOHA :: (2) init_hdr_config :: _hdr_cfg.use_count() = " << _hdr_cfg.use_count() << std::endl;
+            _hdr_cfg = std::make_shared<hdr_config>(*(_owner->_hw_monitor), vall,
                 exposure_range, gain_range);
+            //std::cout << "NOHA :: (3) init_hdr_config :: get_raw_sensor_counter = " << get_raw_sensor_counter() << std::endl;
+            //std::cout << "NOHA :: (3) init_hdr_config :: _hdr_cfg.use_count() = " << _hdr_cfg.use_count() << std::endl;
+            
         }
-
-        std::shared_ptr<hdr_config> get_hdr_config() { return _hdr_cfg; }
-
+        void reset_hdr_config()
+        {
+            return;
+        }
+        std::shared_ptr<hdr_config> get_hdr_config() { return _hdr_cfg.lock(); }
+        int get_hdr_config_count() { return _hdr_cfg.use_count(); }
+        void release_hdr_config() {_hdr_cfg.reset(); }
         float get_stereo_baseline_mm() const override { return _owner->get_stereo_baseline_mm(); }
 
         void create_snapshot(std::shared_ptr<depth_sensor>& snapshot) const override
@@ -430,7 +487,7 @@ namespace librealsense
         const ds5_device* _owner;
         mutable std::atomic<float> _depth_units;
         float _stereo_baseline_mm;
-        std::shared_ptr<hdr_config> _hdr_cfg;
+        std::weak_ptr<hdr_config> _hdr_cfg;
     };
 
     class ds5u_depth_sensor : public ds5_depth_sensor
@@ -559,6 +616,7 @@ namespace librealsense
     std::shared_ptr<synthetic_sensor> ds5_device::create_depth_device(std::shared_ptr<context> ctx,
         const std::vector<platform::uvc_device_info>& all_device_infos)
     {
+        std::cout <<"NOHA :: ds5_device::create_depth_device()" <<std::endl;
         using namespace ds;
 
         auto&& backend = ctx->get_backend();
@@ -569,10 +627,19 @@ namespace librealsense
 
         std::unique_ptr<frame_timestamp_reader> timestamp_reader_backup(new ds5_timestamp_reader(backend.create_time_service()));
         std::unique_ptr<frame_timestamp_reader> timestamp_reader_metadata(new ds5_timestamp_reader_from_metadata(std::move(timestamp_reader_backup)));
-        auto enable_global_time_option = std::shared_ptr<global_time_option>(new global_time_option());
-        auto raw_depth_ep = std::make_shared<uvc_sensor>("Raw Depth Sensor", std::make_shared<platform::multi_pins_uvc_device>(depth_devices),
-            std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(timestamp_reader_metadata), _tf_keeper, enable_global_time_option)), this);
+        //std::unique_ptr<frame_timestamp_reader> timestamp_reader_metadata(new ds5_timestamp_reader_from_metadata( backend.create_time_service()));
 
+        auto enable_global_time_option = std::shared_ptr<global_time_option>(new global_time_option());
+
+        /*auto raw_depth_ep = std::make_shared<uvc_sensor>("Raw Depth Sensor", 
+            std::make_shared<platform::multi_pins_uvc_device>(depth_devices),
+            std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(timestamp_reader_metadata), _tf_keeper, enable_global_time_option)), this);*/
+
+        auto raw_depth_ep = std::make_shared<uvc_sensor>("Raw Depth Sensor",
+            std::make_shared<platform::multi_pins_uvc_device>(depth_devices),
+            nullptr, this);
+
+        /**/
         raw_depth_ep->register_xu(depth_xu); // make sure the XU is initialized every time we power the camera
 
         auto depth_ep = std::make_shared<ds5_depth_sensor>(this, raw_depth_ep);
@@ -597,12 +664,16 @@ namespace librealsense
           _device_capabilities(ds::d400_caps::CAP_UNDEFINED),
           _depth_stream(new stream(RS2_STREAM_DEPTH)),
           _left_ir_stream(new stream(RS2_STREAM_INFRARED, 1)),
-          _right_ir_stream(new stream(RS2_STREAM_INFRARED, 2))
+          _right_ir_stream(new stream(RS2_STREAM_INFRARED, 2))//
     {
         _depth_device_idx = add_sensor(create_depth_device(ctx, group.uvc_devices));
         init(ctx, group);
     }
-
+    ds5_device::~ds5_device()
+    {
+        std::cout << "NOHA :: ~ds5_device()" << std::endl;
+        //environment::get_instance().get_extrinsics_graph().release_streams();
+    }
     void ds5_device::init(std::shared_ptr<context> ctx,
         const platform::backend_device_group& group)
     {
@@ -781,12 +852,14 @@ namespace librealsense
 
         // register HDR options
         //auto global_shutter_mask = d400_caps::CAP_GLOBAL_SHUTTER;
+        auto ds5_depth = As<ds5_depth_sensor, synthetic_sensor>(&get_depth_sensor());
         if ((_fw_version >= hdr_firmware_version))// && ((_device_capabilities & global_shutter_mask) == global_shutter_mask) )
+        //if ((_fw_version < hdr_firmware_version))
         {
-            auto ds5_depth = As<ds5_depth_sensor, synthetic_sensor>(&get_depth_sensor());
+            //auto ds5_depth = As<ds5_depth_sensor, synthetic_sensor>(&get_depth_sensor());
             ds5_depth->init_hdr_config(exposure_range, gain_range);
             auto&& hdr_cfg = ds5_depth->get_hdr_config();
-
+            //std::cout << "NOHA :: (1) -  if ((_fw_version >= hdr_firmware_version)) :: ds5_depth->get_hdr_config_count() = "<< ds5_depth->get_hdr_config_count() <<std::endl;
             // values from 4 to 14 - for internal use
             // value 15 - saved for emiter on off subpreset
             option_range hdr_id_range = { 0.f /*min*/, 3.f /*max*/, 1.f /*step*/, 1.f /*default*/ };
@@ -825,6 +898,11 @@ namespace librealsense
                 std::make_shared<gated_option>(
                     enable_auto_exposure,
                     options_and_reasons));
+            //ds5_depth->reset_hdr_config();
+
+
+
+            //std::cout << "NOHA :: (2) -  if ((_fw_version >= hdr_firmware_version)) :: ds5_depth->get_hdr_config_count() = " << ds5_depth->get_hdr_config_count() << std::endl;
         }
         else
         {
@@ -832,6 +910,9 @@ namespace librealsense
             gain_option = uvc_pu_gain_option;
         }
 
+        //std::cout << "NOHA :: (3) -  if ((_fw_version >= hdr_firmware_version)) :: ds5_depth->get_hdr_config_count() = " << ds5_depth->get_hdr_config_count() << std::endl;
+        ds5_depth->reset_hdr_config();
+        //std::cout << "NOHA :: (4) -  if ((_fw_version >= hdr_firmware_version)) :: ds5_depth->get_hdr_config_count() = " << ds5_depth->get_hdr_config_count() << std::endl;
         //EXPOSURE
         depth_sensor.register_option(RS2_OPTION_EXPOSURE,
             std::make_shared<auto_disabling_control>(
@@ -1112,6 +1193,7 @@ namespace librealsense
     std::shared_ptr<synthetic_sensor> ds5u_device::create_ds5u_depth_device(std::shared_ptr<context> ctx,
         const std::vector<platform::uvc_device_info>& all_device_infos)
     {
+        std::cout << "NOHA :: ds5u_device::create_ds5u_depth_device()"<<std::endl;
         using namespace ds;
 
         auto&& backend = ctx->get_backend();
@@ -1120,11 +1202,22 @@ namespace librealsense
         for (auto&& info : filter_by_mi(all_device_infos, 0)) // Filter just mi=0, DEPTH
             depth_devices.push_back(backend.create_uvc_device(info));
 
-        std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_backup(new ds5_timestamp_reader(backend.create_time_service()));
-        std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_metadata(new ds5_timestamp_reader_from_metadata(std::move(ds5_timestamp_reader_backup)));
+        /*std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_backup(new ds5_timestamp_reader(backend.create_time_service()));
+        std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_metadata(new ds5_timestamp_reader_from_metadata(std::move(ds5_timestamp_reader_backup)));*/
 
-        auto enable_global_time_option = std::shared_ptr<global_time_option>(new global_time_option());
-        auto raw_depth_ep = std::make_shared<uvc_sensor>(ds::DEPTH_STEREO, std::make_shared<platform::multi_pins_uvc_device>(depth_devices), std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(ds5_timestamp_reader_metadata), _tf_keeper, enable_global_time_option)), this);
+        std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_backup(nullptr);
+        std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_metadata(nullptr);
+
+        //auto enable_global_time_option = std::shared_ptr<global_time_option>(new global_time_option());
+        auto enable_global_time_option = std::shared_ptr<global_time_option>(nullptr);
+        /*auto raw_depth_ep = std::make_shared<uvc_sensor>(ds::DEPTH_STEREO, std::make_shared<platform::multi_pins_uvc_device>(depth_devices), 
+            std::unique_ptr<frame_timestamp_reader>(new global_timestamp_reader(std::move(ds5_timestamp_reader_metadata), 
+                _tf_keeper, enable_global_time_option)), this);*/
+
+        auto raw_depth_ep = std::make_shared<uvc_sensor>(ds::DEPTH_STEREO, 
+            nullptr,
+            nullptr, nullptr);
+
         auto depth_ep = std::make_shared<ds5u_depth_sensor>(this, raw_depth_ep);
 
         depth_ep->register_option(RS2_OPTION_GLOBAL_TIME_ENABLED, enable_global_time_option);

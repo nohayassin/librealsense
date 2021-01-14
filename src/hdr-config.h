@@ -30,16 +30,26 @@ namespace librealsense
     class hdr_config
     {
     public:
-        hdr_config(hw_monitor& hwm, std::shared_ptr<sensor_base> depth_ep,
-            const option_range& exposure_range, const option_range& gain_range);
+        /*hdr_config(hw_monitor& hwm, std::shared_ptr<sensor_base> depth_ep,
+            const option_range& exposure_range, const option_range& gain_range);*/
 
+        hdr_config(hw_monitor& hwm, std::weak_ptr<sensor_base> depth_ep,
+            const option_range& exposure_range, const option_range& gain_range);
+        ~hdr_config()
+        {
+            std::cout << "NOHA :: ~hdr_config()"<<std::endl;
+        }
+        //std::shared_ptr<hw_monitor>
+
+        /*hdr_config(std::shared_ptr<hw_monitor>& hwm, std::weak_ptr<sensor_base> depth_ep,
+            const option_range& exposure_range, const option_range& gain_range);*/
 
         float get(rs2_option option) const;
         void set(rs2_option option, float value, option_range range);
         bool is_config_in_process() const;
 
         bool is_enabled() const;
-
+        void hdr_release_hwm();
     private:
         bool is_hdr_id(int id) const;
         bool is_hdr_enabled_in_device(std::vector<byte>& result) const;
@@ -48,7 +58,7 @@ namespace librealsense
         command prepare_hdr_sub_preset_command() const;
         std::vector<uint8_t> prepare_sub_preset_header() const;
         std::vector<uint8_t> prepare_sub_preset_frames_config() const;
-
+        
         const int DEFAULT_HDR_ID = 0;
         const int DEFAULT_CURRENT_HDR_SEQUENCE_INDEX = -1;
         const int DEFAULT_HDR_SEQUENCE_SIZE = 2;
@@ -83,6 +93,7 @@ namespace librealsense
         bool _auto_exposure_to_be_restored;
         bool _emitter_on_off_to_be_restored;
         hw_monitor& _hwm;
+        //std::shared_ptr<hw_monitor>& _hwm;
         std::shared_ptr<sensor_base> _sensor;
         option_range _exposure_range;
         option_range _gain_range;

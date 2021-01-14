@@ -19,8 +19,12 @@ namespace librealsense
        mutable std::recursive_mutex _mtx;
 
     public:
+        //ds5_timestamp_reader_from_metadata(std::unique_ptr<frame_timestamp_reader> backup_timestamp_reader);
         ds5_timestamp_reader_from_metadata(std::unique_ptr<frame_timestamp_reader> backup_timestamp_reader);
-
+        ~ds5_timestamp_reader_from_metadata()
+        {
+            std::cout <<"NOHA :: ~ds5_timestamp_reader_from_metadata()" <<std::endl;
+        }
         bool has_metadata(const std::shared_ptr<frame_interface>& frame);
 
         rs2_time_t get_frame_timestamp(const std::shared_ptr<frame_interface>& frame) override;
@@ -40,7 +44,10 @@ namespace librealsense
         mutable std::recursive_mutex _mtx;
     public:
         ds5_timestamp_reader(std::shared_ptr<platform::time_service> ts);
-
+        ~ds5_timestamp_reader()
+        {
+            std::cout << "NOHA ::  ~ds5_timestamp_reader()"<<std::endl;
+        }
         void reset() override;
 
         rs2_time_t get_frame_timestamp(const std::shared_ptr<frame_interface>& frame) override;

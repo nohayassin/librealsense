@@ -351,6 +351,11 @@ namespace librealsense
     {
     public:
         virtual float get_stereo_baseline_mm() const = 0;
+        
+        ~depth_stereo_sensor()
+        {
+            std::cout << "NOHA :: ~depth_stereo_sensor()"<<std::endl;
+        }
     };
 
     MAP_EXTENSION(RS2_EXTENSION_DEPTH_STEREO_SENSOR, librealsense::depth_stereo_sensor);

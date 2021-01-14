@@ -20,6 +20,31 @@ namespace librealsense
 
         pipeline::~pipeline()
         {
+            std::cout << "NOHA :: ~pipeline()"<<std::endl;
+            /*std::shared_ptr<profile> _active_profile;
+            device_hub _hub;
+            std::shared_ptr<config> _prev_conf;
+            std::shared_ptr<config> _conf;
+
+        private:
+            std::shared_ptr<profile> unsafe_get_active_profile() const;
+
+            std::shared_ptr<librealsense::context> _ctx;
+            int _playback_stopped_token = -1;
+            dispatcher _dispatcher;
+
+            std::unique_ptr<syncer_process_unit> _syncer;
+            std::unique_ptr<aggregator> _aggregator;
+
+            frame_callback_ptr _streams_callback;
+            std::vector<rs2_stream> _synced_streams;*/
+            /*_ctx.reset();
+            _dispatcher.flush();
+            _synced_streams.clear();
+            _syncer.release();
+            _aggregator.release();
+            _streams_callback.reset();
+            _syncer.release();*/
             if (_active_profile) {
                 try {
                     unsafe_stop();
@@ -36,6 +61,7 @@ namespace librealsense
                 throw librealsense::wrong_api_call_sequence_exception("start() cannot be called before stop()");
             }
             _streams_callback = callback;
+            _conf = conf;
             unsafe_start(conf);
             return unsafe_get_active_profile();
         }
@@ -56,9 +82,17 @@ namespace librealsense
 
         void pipeline::unsafe_start(std::shared_ptr<config> conf)
         {
+            environment::get_instance().get_extrinsics_graph().release_streams();
+
+            auto t1 = std::chrono::system_clock::now();
             std::shared_ptr<profile> profile = nullptr;
             //first try to get the previously resolved profile (if exists)
             auto cached_profile = conf->get_cached_resolved_profile();
+
+            auto t2 = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  pipeline::unsafe_start (1) : " << diff << " msec" << std::endl;
+
             if (cached_profile)
             {
                 profile = cached_profile;
@@ -70,7 +104,12 @@ namespace librealsense
                 {
                     try
                     {
+                        t1 = std::chrono::system_clock::now();
+
                         profile = conf->resolve(shared_from_this(), std::chrono::seconds(5));
+                        auto t2 = std::chrono::system_clock::now();
+                        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                       // std::cout << "NOHA ::  pipeline::unsafe_start (2) : " << diff << " msec" << std::endl;
                         break;
                     }
                     catch (...)
@@ -81,6 +120,8 @@ namespace librealsense
                 }
             }
 
+            t1 = std::chrono::system_clock::now();
+
             assert(profile);
             assert(profile->_multistream.get_profiles().size() > 0);
 
@@ -89,6 +130,15 @@ namespace librealsense
             frame_callback_ptr callbacks = get_callback(synced_streams_ids);
 
             auto dev = profile->get_device();
+
+
+            t2 = std::chrono::system_clock::now();
+            diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  pipeline::unsafe_start (3) : " << diff << " msec" << std::endl;
+
+
+            t1 = std::chrono::system_clock::now();
+
             if (auto playback = As<librealsense::playback_device>(dev))
             {
                 _playback_stopped_token = playback->playback_status_changed += [this, callbacks](rs2_playback_status status)
@@ -109,11 +159,22 @@ namespace librealsense
                 };
             }
 
+            t2 = std::chrono::system_clock::now();
+            diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  pipeline::unsafe_start (4) : " << diff << " msec" << std::endl;
+
+
+            t1 = std::chrono::system_clock::now();
+
             _dispatcher.start();
             profile->_multistream.open();
             profile->_multistream.start(callbacks);
             _active_profile = profile;
             _prev_conf = std::make_shared<config>(*conf);
+
+            t2 = std::chrono::system_clock::now();
+             diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+            //std::cout << "NOHA ::  pipeline::unsafe_start (5) : " << diff << " msec" << std::endl;
         }
 
         void pipeline::stop()
@@ -139,8 +200,11 @@ namespace librealsense
                         playback->playback_status_changed -= _playback_stopped_token;
                     }
                     _active_profile->_multistream.stop();
+                    //std::this_thread::sleep_for(std::chrono::milliseconds(100));
                     _active_profile->_multistream.close();
                     _dispatcher.stop();
+                    //_active_profile->reset_device(); // NOHA ADDED
+                    //_active_profile->_multistream.delete_profiles(); // NOHA ADDED
                 }
                 catch (...)
                 {
@@ -149,8 +213,41 @@ namespace librealsense
                 // shared pointers initialized when pipeline running with _active_profile
                 // should be reset with _active_profile too
                 _active_profile.reset();
+                //_prev_conf->unresolve(); // NOHA ADDED
                 _prev_conf.reset();
+                
+                //_conf->unresolve(); // NOHA ADDED
+
+
+                //_conf.reset(); // NOHA ADDED
+
                 _streams_callback.reset();
+
+                /*_ctx.reset();// NOHA ADDED
+                _dispatcher.flush();// NOHA ADDED
+                _syncer.reset();// NOHA ADDED
+                _aggregator.reset();// NOHA ADDED
+                _synced_streams.clear();// NOHA ADDED*/
+                /*std::shared_ptr<profile> _active_profile;
+            device_hub _hub;
+            std::shared_ptr<config> _prev_conf;
+            std::shared_ptr<config> _conf;
+
+        private:
+            std::shared_ptr<profile> unsafe_get_active_profile() const;
+
+            std::shared_ptr<librealsense::context> _ctx;
+            int _playback_stopped_token = -1;
+            dispatcher _dispatcher;
+
+            std::unique_ptr<syncer_process_unit> _syncer;
+            std::unique_ptr<aggregator> _aggregator;
+
+            frame_callback_ptr _streams_callback;
+            std::vector<rs2_stream> _synced_streams;*/
+            
+                
+
             }
         }
 

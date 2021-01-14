@@ -8,6 +8,9 @@ namespace librealsense
     extrinsics_graph::extrinsics_graph()
         : _locks_count(0)
     {
+        
+            std::cout << "NOHA :: extrinsics_graph()" << std::endl;
+        
         _id = std::make_shared<lazy<rs2_extrinsics>>([]()
         {
             return identity_matrix();
@@ -20,6 +23,16 @@ namespace librealsense
         return l;
     }
 
+    extrinsics_graph::extrinsics_lock extrinsics_graph::unlock()
+    {
+        extrinsics_lock u(*this);
+        return u;
+    }
+    void extrinsics_graph::release_streams()
+    {
+       // _streams.clear();
+        cleanup_extrinsics();
+    }
     void extrinsics_graph::register_same_extrinsics(const stream_interface& from, const stream_interface& to)
     {
         register_extrinsics(from, to, _id);
@@ -27,22 +40,61 @@ namespace librealsense
 
     void extrinsics_graph::register_extrinsics(const stream_interface& from, const stream_interface& to, std::weak_ptr<lazy<rs2_extrinsics>> extr)
     {
+        auto t0 = std::chrono::system_clock::now();
         std::lock_guard<std::mutex> lock(_mutex);
 
         // First, trim any dead stream, to make sure we are not keep gaining memory
         cleanup_extrinsics();
 
+        auto t1 = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+        //std::cout << "NOHA ::  extrinsics_graph::register_extrinsics (????? 1 ??????) : " << diff << " usec" << std::endl;
+        t0 = std::chrono::system_clock::now();
+
         // Second, register new extrinsics
         auto from_idx = find_stream_profile(from);
+
+        t1 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+        //std::cout << "NOHA ::  extrinsics_graph::register_extrinsics (????? 1 ??????) : " << diff << " usec" << std::endl;
+        t0 = std::chrono::system_clock::now();
+
         // If this is a new index, add it to the map preemptively,
         // This way find on to will be able to return another new index
         if (_extrinsics.find(from_idx) == _extrinsics.end())
             _extrinsics.insert({from_idx, {}});
 
+        t1 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+        //std::cout << "NOHA ::  extrinsics_graph::register_extrinsics (????? 2 ??????) : " << diff << " usec" << std::endl;
+        t0 = std::chrono::system_clock::now();
+
         auto to_idx = find_stream_profile(to);
+
+        t1 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+        //std::cout << "NOHA ::  extrinsics_graph::register_extrinsics (????? 3 ??????) : " << diff << " usec" << std::endl;
+        t0 = std::chrono::system_clock::now();
 
         _extrinsics[from_idx][to_idx] = extr;
         _extrinsics[to_idx][from_idx] = std::shared_ptr<lazy<rs2_extrinsics>>(nullptr);
+
+        /*if (_extrinsics.size() > 440)
+        {
+            std::cout << "NOHA :: _extrinsics.size() = "<< _extrinsics.size() <<std::endl;
+        }
+        if (_extrinsics.size() > 6)
+        {
+            std::cout << "NOHA :: _extrinsics.size() = " << _extrinsics.size() << std::endl;
+        }
+        if (_extrinsics.size() > 210)
+        {
+            std::cout << "NOHA :: _extrinsics.size() = " << _extrinsics.size() << std::endl;
+        }*/
+        t1 = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+        //std::cout << "NOHA ::  extrinsics_graph::register_extrinsics (????? 4 ??????) : " << diff << " usec" << std::endl;
+
     }
 
     void extrinsics_graph::register_extrinsics(const stream_interface & from, const stream_interface & to, rs2_extrinsics extr)
@@ -81,15 +133,18 @@ namespace librealsense
 
     void extrinsics_graph::cleanup_extrinsics()
     {
+        //std::cout << "NOHA :: extrinsics_graph::cleanup_extrinsics (1) :: _locks_count.load() = "<< _locks_count.load() << std::endl;
         if (_locks_count.load()) return;
-
+        //std::cout << "NOHA :: extrinsics_graph::cleanup_extrinsics (2) :: _locks_count.load() = " << _locks_count.load() << std::endl;
         auto counter = 0;
         std::vector<int> invalid_ids;
         for (auto&& kvp : _streams)
         {
-            if (!kvp.second.lock())
+            auto invalid_id = kvp.first;
+            //if (!kvp.second.lock() || !_extrinsics[invalid_id].size())
+            if (!kvp.second.lock() )
             {
-                auto invalid_id = kvp.first;
+                //auto invalid_id = kvp.first;
                 // Delete all extrinsics going out of this stream
                 _extrinsics.erase(invalid_id);
                 ++counter;
@@ -114,17 +169,54 @@ namespace librealsense
 
     int extrinsics_graph::find_stream_profile(const stream_interface& p, bool add_if_not_there)
     {
+        auto t0 = std::chrono::system_clock::now();
+
         auto sp = p.shared_from_this();
+        //stream_profile_interface
+        //auto sp = std::weak_ptr<stream_profile_interface>(p);
+        
         auto max = 0;
+        int count = 0;
         for (auto&& kvp : _streams)
         {
+            count += 1;
+            auto val1 = kvp.second.lock().get();
+            auto val2 = sp.get();
             if (kvp.second.lock().get() == sp.get())
+            {
+                auto t1 = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+                //std::cout << "NOHA ::  extrinsics_graph::find_stream_profile (XXXX 1 XXXX) :  "<< diff << " usec" << std::endl;
+                //std::cout << "NOHA ::  extrinsics_graph::find_stream_profile (XXXX 1 XXXX) : count = " << count << "  _streams.size()  =" << _streams.size() << std::endl;
+
                 return kvp.first;
+            }
             max = std::max( max, kvp.first );
         }
-        if( !add_if_not_there )
+        if (!add_if_not_there)
+        {
+            auto t1 = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+            //std::cout << "NOHA ::  extrinsics_graph::find_stream_profile (XXXX 2 XXXX) : " << diff << " usec" << std::endl;
+
             return -1;
-        _streams[max + 1] = sp;
+        }
+        //if (max > 443) {
+        //    _streams.clear();
+        //}
+        //else {
+            _streams[max + 1] = sp;
+           // auto pp = std::weak_ptr<const stream_interface>(sp);
+            //_streams[max + 1] = pp;
+
+        //_streams[max + 1] = std::weak_ptr<stream_interface>(sp);
+       // std::weak_ptr<stream_interface> wp1{ sp };  //
+        //}
+            //std::weak_ptr<stream_interface>(p).lock().get();
+        auto t1 = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+        //std::cout << "NOHA ::  extrinsics_graph::find_stream_profile (XXXX 3 XXXX) : " << diff << " usec" << "-- MAX = "<<max << "count = "<< count<<std::endl;
+        t0 = std::chrono::system_clock::now();
         return max + 1;
 
     }

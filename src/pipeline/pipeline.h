@@ -46,6 +46,7 @@ namespace librealsense
             std::shared_ptr<profile> _active_profile;
             device_hub _hub;
             std::shared_ptr<config> _prev_conf;
+            std::shared_ptr<config> _conf;
 
         private:
             std::shared_ptr<profile> unsafe_get_active_profile() const;

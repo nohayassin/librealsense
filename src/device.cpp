@@ -282,6 +282,7 @@ std::vector<rs2_format> device::map_supported_color_formats(rs2_format source_fo
 
 void device::tag_profiles(stream_profiles profiles) const
 {
+   // std::cout <<"NOHA :: device::tag_profiles " <<std::endl;
     for (auto profile : profiles)
     {
         for (auto tag : *_profiles_tags)

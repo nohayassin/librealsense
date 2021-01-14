@@ -412,6 +412,10 @@ namespace librealsense
         ds5_motion(std::shared_ptr<context> ctx,
                    const platform::backend_device_group& group);
 
+        ds5_motion::~ds5_motion()
+        {
+            std::cout << "NOHA :: ~ds5_motion()" << std::endl;
+        }
         rs2_motion_device_intrinsic get_motion_intrinsics(rs2_stream) const;
 
         std::shared_ptr<auto_exposure_mechanism> register_auto_exposure_options(synthetic_sensor* ep,

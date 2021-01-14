@@ -72,6 +72,8 @@ namespace librealsense
 
         stream_profiles init_stream_profiles() override
         {
+            std::cout << "NOHA :: ds5_hid_sensor::init_stream_profiles()" << std::endl;
+
             auto lock = environment::get_instance().get_extrinsics_graph().lock();
             auto results = synthetic_sensor::init_stream_profiles();
 
@@ -352,6 +354,7 @@ namespace librealsense
         }
     }
 
+    
     void ds5_motion::initialize_fisheye_sensor(std::shared_ptr<context> ctx, const platform::backend_device_group& group)
     {
         using namespace ds;

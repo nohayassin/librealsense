@@ -13,6 +13,10 @@ namespace librealsense
     {
     public:
         extrinsics_graph();
+        ~extrinsics_graph()
+        {
+            std::cout << "NOHA :: ~extrinsics_graph()"<<std::endl;
+        }
         void register_same_extrinsics(const stream_interface& from, const stream_interface& to);
         void register_extrinsics(const stream_interface& from, const stream_interface& to, std::weak_ptr<lazy<rs2_extrinsics>> extr);
         void register_extrinsics(const stream_interface& from, const stream_interface& to, rs2_extrinsics extr);
@@ -37,12 +41,39 @@ namespace librealsense
 
             ~extrinsics_lock() {
                 _owner._locks_count.fetch_sub(1);
+                //_owner.cleanup_extrinsics();
+            }
+
+            extrinsics_graph& _owner;
+        };
+
+        struct extrinsics_unlock
+        {
+            extrinsics_unlock(extrinsics_graph& owner)
+                : _owner(owner)
+            {
+                //_owner.cleanup_extrinsics();
+                _owner._locks_count.fetch_add(1);
+            }
+
+            extrinsics_unlock(const extrinsics_lock& lock)
+                : _owner(lock._owner)
+            {
+                _owner._locks_count = lock._owner._locks_count.load();
+                _owner._locks_count.fetch_add(1);
+            }
+
+            ~extrinsics_unlock() {
+                _owner._locks_count.fetch_sub(1);
             }
 
             extrinsics_graph& _owner;
         };
 
         extrinsics_lock lock();
+        extrinsics_lock unlock();
+
+        void release_streams();
 
     private:
         std::mutex _mutex;
@@ -59,7 +90,8 @@ namespace librealsense
         std::atomic<int> _locks_count;
         std::map<int, std::map<int, std::weak_ptr<lazy<rs2_extrinsics>>>> _extrinsics;
 
-        std::map<int, std::weak_ptr<const stream_interface>> _streams;
+         std::map<int, std::weak_ptr<const stream_interface>> _streams;
+        //std::map<int, std::weak_ptr<lazy<const stream_interface>>> _streams;
 
     };
 

@@ -221,6 +221,7 @@ namespace librealsense
 
         ~locked_transfer()
         {
+            std::cout <<"NOHA ::  ~locked_transfer()" <<std::endl;
             _heap.wait_until_empty();
         }
     private:
@@ -320,7 +321,10 @@ namespace librealsense
         explicit hw_monitor(std::shared_ptr<locked_transfer> locked_transfer)
             : _locked_transfer(std::move(locked_transfer))
         {}
-
+        ~hw_monitor()
+        {
+            std::cout << "NOHA ::  ~hw_monitor()"<<std::endl;
+        }
         std::vector<uint8_t> send(std::vector<uint8_t> data) const;
         std::vector<uint8_t> send( command cmd, hwmon_response * = nullptr, bool locked_transfer = false ) const;
         void get_gvd(size_t sz, unsigned char* gvd, uint8_t gvd_cmd) const;

@@ -3626,6 +3626,7 @@ namespace rs2
 
     device_model::~device_model()
     {
+        std::cout <<"NOHA :: ~device_model()" <<std::endl;
         for (auto&& n : related_notifications) n->dismiss(false);
 
         _updates->set_device_status(*_updates_profile, false);

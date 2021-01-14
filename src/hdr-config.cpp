@@ -6,8 +6,13 @@
 
 namespace librealsense
 {
-    hdr_config::hdr_config(hw_monitor& hwm, std::shared_ptr<sensor_base> depth_ep,
+    /*hdr_config::hdr_config(hw_monitor& hwm, std::shared_ptr<sensor_base> depth_ep,
+        const option_range& exposure_range, const option_range& gain_range) :*/
+    hdr_config::hdr_config(hw_monitor& hwm, std::weak_ptr<sensor_base> depth_ep,
         const option_range& exposure_range, const option_range& gain_range) :
+    /*hdr_config::hdr_config(std::shared_ptr<hw_monitor>& hwm, std::weak_ptr<sensor_base> depth_ep,
+            const option_range& exposure_range, const option_range& gain_range) :*/
+        //
         _hwm(hwm),
         _sensor(depth_ep),
         _is_enabled(false),
@@ -46,7 +51,11 @@ namespace librealsense
             _hdr_sequence_params[1] = params_1;
         }
     }
-
+    void hdr_config::hdr_release_hwm()
+    {
+        //_hwm.~hw_monitor();
+        return;
+    }
     bool hdr_config::is_hdr_enabled_in_device(std::vector<byte>& result) const
     {
         command cmd(ds::GETSUBPRESET);

@@ -284,6 +284,7 @@ namespace librealsense
 
     l500_depth_sensor::~l500_depth_sensor()
     {
+        std::cout << "NOHA :: ~l500_depth_sensor()" << std::endl;
         _owner->stop_temperatures_reader();
     }
 

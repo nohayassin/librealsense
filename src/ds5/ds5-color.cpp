@@ -44,6 +44,7 @@ namespace librealsense
         : ds5_device(ctx, group), device(ctx, group),
           _color_stream(new stream(RS2_STREAM_COLOR))
     {
+        std::cout << "NOHA :: ds5_color::ds5_color()" << std::endl;
         using namespace ds;
 
         _color_calib_table_raw = [this]() { return get_raw_calibration_table(rgb_calibration_id); };
@@ -62,6 +63,7 @@ namespace librealsense
     std::shared_ptr<synthetic_sensor> ds5_color::create_color_device(std::shared_ptr<context> ctx,
         const std::vector<platform::uvc_device_info>& color_devices_info)
     {
+        std::cout << "NOHA :: ds5_color::create_color_device()" << std::endl;
         auto&& backend = ctx->get_backend();
         std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_backup(new ds5_timestamp_reader(backend.create_time_service()));
         std::unique_ptr<frame_timestamp_reader> ds5_timestamp_reader_metadata(new ds5_timestamp_reader_from_metadata(std::move(ds5_timestamp_reader_backup)));
@@ -205,8 +207,10 @@ namespace librealsense
 
     stream_profiles ds5_color_sensor::init_stream_profiles()
     {
+        std::cout << "NOHA :: ds5_color_sensor::init_stream_profiles()"<<std::endl;
         auto lock = environment::get_instance().get_extrinsics_graph().lock();
         auto&& results = synthetic_sensor::init_stream_profiles();
+        //auto unlock = environment::get_instance().get_extrinsics_graph().unlock();
 
         for (auto&& p : results)
         {
@@ -231,6 +235,7 @@ namespace librealsense
             });
         }
 
+        //_owner->_color_stream->~stream_interface();
         return results;
     }
 

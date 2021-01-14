@@ -739,6 +739,7 @@ namespace librealsense
 
             std::vector<stream_profile> get_profiles() const override
             {
+                auto t1 = std::chrono::system_clock::now();
                 std::vector<stream_profile> all_stream_profiles;
                 for (auto& elem : _dev)
                 {
@@ -746,6 +747,11 @@ namespace librealsense
                     all_stream_profiles.insert(all_stream_profiles.end(),
                         pin_stream_profiles.begin(), pin_stream_profiles.end());
                 }
+
+                auto t2 = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                //std::cout << "NOHA ::  std::vector<stream_profile> get_profiles() (1): " << diff << " msec" << std::endl;
+
                 return all_stream_profiles;
             }
 

@@ -156,14 +156,24 @@ namespace librealsense
 
                 void close()
                 {
-                    for (auto&& sensor : _results)
-                        sensor.second->close();
+                    //_profiles.clear();
+                    for (auto&& kvp : _dev_to_profiles) {
+                        auto&& sub = _results.at(kvp.first);
+                        sub->close();
+                    }
+
+                    //for (auto&& sensor : _results)
+                      //  sensor.second->close();
                 }
                 std::map<index_type, std::shared_ptr<stream_profile_interface>> get_profiles() const
                 {
                     return _profiles;
                 }
-
+                // NOHA :: ADDED 
+                void delete_profiles() 
+                {
+                    _profiles.clear();
+                }
                 std::map<int, stream_profiles> get_profiles_per_sensor() const
                 {
                     return _dev_to_profiles;
@@ -265,10 +275,18 @@ namespace librealsense
 
             multistream resolve(device_interface* dev)
             {
+                auto t1 = std::chrono::system_clock::now();
+
                  auto mapping = map_streams(dev);
+
+                 auto t2 = std::chrono::system_clock::now();
+                 auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                 //std::cout << "NOHA ::  resolve (0): " << diff << " msec" << std::endl;
 
                 // If required, make sure we've succeeded at opening
                 // all the requested streams
+
+                 t1 = std::chrono::system_clock::now();
                 if (require_all)
                 {
                     std::set<index_type> all_streams;
@@ -279,14 +297,26 @@ namespace librealsense
                     {
                         auto it = std::find_if(std::begin(all_streams), std::end(all_streams), [&](const index_type& i)
                         {
-                            return match_stream(kvp.first, i);
+                                
+
+                            auto val =  match_stream(kvp.first, i);
+                            auto t2 = std::chrono::system_clock::now();
+                            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                            //std::cout << "NOHA ::  resolve (1): " << diff << " msec" << std::endl;
+
+                            return val;
                         });
                         if (it == std::end(all_streams))
                             throw std::runtime_error("Config couldn't configure all streams");
                     }
                 }
 
+                t2 = std::chrono::system_clock::now();
+                diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                //std::cout << "NOHA ::  resolve (1): " << diff << " msec" << std::endl;
+
                 // Unpack the data returned by assign
+                t1 = std::chrono::system_clock::now();
                 std::map<int, stream_profiles> dev_to_profiles;
                 std::map<index_type, std::shared_ptr<stream_profile_interface>> stream_to_profile;
 
@@ -305,8 +335,18 @@ namespace librealsense
                     stream_to_profile[idx] = kvp.second;
                 }
 
+                t2 = std::chrono::system_clock::now();
+                diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                //std::cout << "NOHA ::  resolve (2): " << diff << " msec" << std::endl;
                 // TODO: make sure it works
-                return multistream(std::move(sensors_map), std::move(stream_to_profile), std::move(dev_to_profiles));
+
+                t1 = std::chrono::system_clock::now();
+                auto val =  multistream(std::move(sensors_map), std::move(stream_to_profile), std::move(dev_to_profiles));
+
+                t2 = std::chrono::system_clock::now();
+                diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                //std::cout << "NOHA ::  resolve (3): " << diff << " msec" << std::endl;
+                return val;
             }
 
         private:
@@ -384,11 +424,13 @@ namespace librealsense
 
             stream_profiles map_sub_device(stream_profiles profiles, std::set<index_type> satisfied_streams, const device_interface* dev) const
             {
+                
+                auto t1 = std::chrono::system_clock::now();
                 stream_profiles rv;
                 try
                 {
                     std::vector<stream_profile> targets;
-
+                   
                     // deal with explicit requests
                     for (auto && kvp : _requests)
                     {
@@ -397,7 +439,16 @@ namespace librealsense
                          // if any profile on the subdevice can supply this request, consider it satisfiable
                         auto it = std::find_if(begin(profiles), end(profiles), [&kvp](const std::shared_ptr<stream_profile_interface>& profile)
                         {
-                            return match(profile.get(), kvp.second);
+                                auto t1 = std::chrono::system_clock::now();
+
+                            auto val =  match(profile.get(), kvp.second);
+
+                            auto t2 = std::chrono::system_clock::now();
+                            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                            //std::cout << "NOHA ::  map_sub_device (0): " << diff << " msec" << std::endl;
+                            t1 = std::chrono::system_clock::now();
+
+                            return val;
                         });
                         if (it != end(profiles))
                         {
@@ -405,6 +456,11 @@ namespace librealsense
                             satisfied_streams.insert(kvp.first); // mark stream as satisfied
                         }
                     }
+
+                    auto t2 = std::chrono::system_clock::now();
+                    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                    //std::cout << "NOHA ::  map_sub_device (1): " << diff << " msec" << std::endl;
+                    t1 = std::chrono::system_clock::now();
 
                     if (targets.size() > 0) // if subdevice is handling any streams
                     {
@@ -427,6 +483,11 @@ namespace librealsense
                 {
                     LOG_ERROR(e.what());
                 }
+
+                auto t2 = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                //std::cout << "NOHA ::  map_sub_device (2): " << diff << " msec" << std::endl;
+
                 return rv;
             }
 
@@ -437,12 +498,34 @@ namespace librealsense
 
                 // Algorithm assumes get_adjacent_devices always
                 // returns the devices in the same order
+
+                auto t1 = std::chrono::system_clock::now();
+
                 for (size_t i = 0; i < dev->get_sensors_count(); ++i)
                 {
+                    auto t0 = std::chrono::system_clock::now();
+
                     auto&& sub = dev->get_sensor(i);
 
+                    auto t2 = std::chrono::system_clock::now();
+                    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0).count();
+                    //std::cout << "NOHA ::  map_streams (0): " << diff << " msec" << std::endl;
+                    t0 = std::chrono::system_clock::now();
+
                     auto default_profiles = map_sub_device(sub.get_stream_profiles(profile_tag::PROFILE_TAG_SUPERSET), satisfied_streams, dev);
+
+                    t2 = std::chrono::system_clock::now();
+                    diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0).count();
+                    //std::cout << "NOHA ::  map_streams (1): " << diff << " msec" << std::endl;
+                    t0 = std::chrono::system_clock::now();
+
                     auto any_profiles = map_sub_device(sub.get_stream_profiles(profile_tag::PROFILE_TAG_ANY), satisfied_streams, dev);
+
+
+                    t2 = std::chrono::system_clock::now();
+                    diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t0).count();
+                    //std::cout << "NOHA ::  map_streams (2): " << diff << " msec" << std::endl;
+                    t0 = std::chrono::system_clock::now();
 
                     //use any streams if default streams wasn't satisfy
                     auto profiles = default_profiles.size() == any_profiles.size() ? default_profiles : any_profiles;
@@ -453,6 +536,10 @@ namespace librealsense
 
                 if(_requests.size() != out.size())
                     throw std::runtime_error(std::string("Couldn't resolve requests"));
+
+                auto t2 = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                //std::cout << "NOHA ::  map_streams (3): " << diff << " msec" << std::endl;
 
                 return out;
             }

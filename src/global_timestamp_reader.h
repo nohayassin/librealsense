@@ -94,7 +94,10 @@ namespace librealsense
         unsigned long long get_frame_counter(const std::shared_ptr<frame_interface>& frame) const override;
         rs2_timestamp_domain get_frame_timestamp_domain(const std::shared_ptr<frame_interface>& frame) const override;
         void reset() override;
-
+        ~global_timestamp_reader()
+        {
+            std::cout <<"NOHA :: ~global_timestamp_reader()" <<std::endl;
+        }
     private:
         std::unique_ptr<frame_timestamp_reader> _device_timestamp_reader;
         std::weak_ptr<time_diff_keeper> _time_diff_keeper;

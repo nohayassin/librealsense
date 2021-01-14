@@ -19,6 +19,7 @@ namespace librealsense
         {
         public:
             config();
+            ~config();
             void enable_stream(rs2_stream stream, int index, uint32_t width, uint32_t height, rs2_format format, uint32_t framerate);
             void enable_all_stream();
             void enable_device(const std::string& serial);
@@ -27,6 +28,7 @@ namespace librealsense
             void disable_stream(rs2_stream stream, int index = -1);
             void disable_all_streams();
             std::shared_ptr<profile> resolve(std::shared_ptr<pipeline> pipe, const std::chrono::milliseconds& timeout = std::chrono::milliseconds(0));
+            void unresolve();
             bool can_resolve(std::shared_ptr<pipeline> pipe);
             bool get_repeat_playback();
 
