@@ -12,11 +12,13 @@
 #include "../../common/tiny-profiler.h"
 #include "./../src/environment.h"
 
+#include <unit-tests-common.h>
+
 using namespace librealsense;
 using namespace librealsense::platform;
 
 // Require that vector is exactly the zero vector
-inline void require_zero_vector(const float(&vector)[3])
+/*inline void require_zero_vector(const float(&vector)[3])
 {
     for (int i = 1; i < 3; ++i) REQUIRE(vector[i] == 0.0f);
 }
@@ -26,6 +28,24 @@ inline void require_identity_matrix(const float(&matrix)[9])
 {
     static const float identity_matrix_3x3[] = { 1,0,0, 0,1,0, 0,0,1 };
     for (int i = 0; i < 9; ++i) REQUIRE(matrix[i] == approx(identity_matrix_3x3[i]));
+}*/
+bool get_mode(rs2::device& dev, rs2::stream_profile* profile, int mode_index = 0)
+{
+    auto sensors = dev.query_sensors();
+    REQUIRE(sensors.size() > 0);
+
+    for (auto i = 0; i < sensors.size(); i++)
+    {
+        auto modes = sensors[i].get_stream_profiles();
+        REQUIRE(modes.size() > 0);
+
+        if (mode_index >= modes.size())
+            continue;
+
+        *profile = modes[mode_index];
+        return true;
+    }
+    return false;
 }
 
 TEST_CASE("Extrinsic graph management", "[live][multicam]")
@@ -92,62 +112,91 @@ TEST_CASE("Extrinsic graph management", "[live][multicam]")
         WARN("TODO: Graph size shall be preserved: init " << init_size << " != final " << end_size);
     }
 }
-TEST_CASE("Extrinsic memory leak detection", "[live]")
+TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 {
     // Require at least one device to be plugged in
     rs2::context ctx;
     {
-        std::cout << "Extrinsic memory leak detection started" << std::endl;
+        std::cout << "Pipe - Extrinsic memory leak detection started" << std::endl;
         auto list = ctx.query_devices();
         REQUIRE(list.size());
+        auto dev = list.front();
+        //auto sens = dev.query_sensors();
 
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
         auto& b = environment::get_instance().get_extrinsics_graph();
-        auto init_size = b._streams.size();
+        //auto init_size = b._streams.size();
         auto initial_extrinsics_size = b._extrinsics.size();
 
-        bool first = true;
-        auto frames_per_iteration = 30 * 5; // fps * 5
-        for (int i = 0; i < 20; i++)
+
+        
+
+        // profiles
+        rs2::stream_profile mode;
+        auto mode_index = 0;
+        bool usb3_device = is_usb3(dev);
+        int fps = usb3_device ? 30 : 15; // In USB2 Mode the devices will switch to lower FPS rates
+        int req_fps = usb3_device ? 60 : 30; // USB2 Mode has only a single resolution for 60 fps which is not sufficient to run the test
+
+        do
         {
+            REQUIRE(get_mode(dev, &mode, mode_index));
+            mode_index++;
+        } while (mode.fps() != req_fps);
 
-            rs2::pipeline pipe;
-            rs2::config cfg;
-            cfg.enable_stream(RS2_STREAM_COLOR, -1, 640, 480, RS2_FORMAT_YUYV, 30);
-            pipe.start(cfg);
+        auto video = mode.as<rs2::video_stream_profile>();
+        auto res = configure_all_supported_streams(dev, video.width(), video.height(), mode.fps());
 
-            try
+        std::map<std::string, size_t> extrinsic_graph_at_cfg;
+        for (auto profile : res.second)
+        {
+            int type = profile.stream;
+            int format = profile.format;
+            std::cout << "stream type :" << type << ", index : " << profile.index << ", width : " << profile.width << ", height : " << profile.height << ", format : " << format << ", fps : " << profile.fps << std::endl;
+            std::string cfg_key = std::to_string(format) + "," +std::to_string(profile.fps);
+            std::cout <<"cfg key :"<< cfg_key <<std::endl;
+            for (auto i = 0; i < 3; i++)
             {
-                for (auto i = 0; i < frames_per_iteration; i++)
+                rs2::pipeline pipe;
+                rs2::config cfg;
+                cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps);
+                pipe.start(cfg);
+                auto frames_per_iteration = profile.fps * 5;
+                bool first = true;
+                try
                 {
-                    rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
-                }
-                pipe.stop();
+                    auto t1 = std::chrono::system_clock::now();
+                    for (auto i = 0; i < frames_per_iteration; i++)
+                    {
+                        rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+                    }
+                    pipe.stop();
 
-                if (first)
+                    if (first)
+                    {
+                        auto t2 = std::chrono::system_clock::now();
+                        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+
+                        
+                        if (!extrinsic_graph_at_cfg.count(cfg_key))
+                        {
+                            //initial_extrinsics_size = b._extrinsics.size();
+                            extrinsic_graph_at_cfg[cfg_key] = b._extrinsics.size();
+                        }
+                        std::cout << " Initial Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff <<std::endl;
+                        first = false;
+                    }
+                    else {
+                        REQUIRE(b._extrinsics.size() == extrinsic_graph_at_cfg[cfg_key]);
+
+                    }
+                }
+                catch (...)
                 {
-                    initial_extrinsics_size = b._extrinsics.size();
-                    std::cout << " Initial Extrinsic Graph size is " << initial_extrinsics_size << std::endl;
-                    first = false;
-                }
-                else {
-                    REQUIRE(b._extrinsics.size() == initial_extrinsics_size);
-
+                    std::cout << "Iteration failed  " << std::endl;
+                    exit(EXIT_FAILURE);
                 }
             }
-            catch (...)
-            {
-                std::cout << "Iteration failed  " << std::endl;
-                break;
-            }
-
-            std::cout << "Iteration " << i << " : Extrinsic graph map size is " << b._extrinsics.size() << std::endl;
-
         }
-
-        auto end_size = b._extrinsics.size();
-        std::cout << " Final Extrinsic Graph size is " << end_size << std::endl;
-        //REQUIRE(end_size == init_size); TODO doesn't pass yet
-        WARN("TODO: Graph size shall be preserved: init " << init_size << " != final " << end_size);
     }
 }
