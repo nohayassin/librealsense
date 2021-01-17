@@ -92,3 +92,62 @@ TEST_CASE("Extrinsic graph management", "[live][multicam]")
         WARN("TODO: Graph size shall be preserved: init " << init_size << " != final " << end_size);
     }
 }
+TEST_CASE("Extrinsic memory leak detection", "[live]")
+{
+    // Require at least one device to be plugged in
+    rs2::context ctx;
+    {
+        std::cout << "Extrinsic memory leak detection started" << std::endl;
+        auto list = ctx.query_devices();
+        REQUIRE(list.size());
+
+        std::map<std::string, size_t> extrinsic_graph_at_sensor;
+        auto& b = environment::get_instance().get_extrinsics_graph();
+        auto init_size = b._streams.size();
+        auto initial_extrinsics_size = b._extrinsics.size();
+
+        bool first = true;
+        auto frames_per_iteration = 30 * 5; // fps * 5
+        for (int i = 0; i < 20; i++)
+        {
+
+            rs2::pipeline pipe;
+            rs2::config cfg;
+            cfg.enable_stream(RS2_STREAM_COLOR, -1, 640, 480, RS2_FORMAT_YUYV, 30);
+            pipe.start(cfg);
+
+            try
+            {
+                for (auto i = 0; i < frames_per_iteration; i++)
+                {
+                    rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+                }
+                pipe.stop();
+
+                if (first)
+                {
+                    initial_extrinsics_size = b._extrinsics.size();
+                    std::cout << " Initial Extrinsic Graph size is " << initial_extrinsics_size << std::endl;
+                    first = false;
+                }
+                else {
+                    REQUIRE(b._extrinsics.size() == initial_extrinsics_size);
+
+                }
+            }
+            catch (...)
+            {
+                std::cout << "Iteration failed  " << std::endl;
+                break;
+            }
+
+            std::cout << "Iteration " << i << " : Extrinsic graph map size is " << b._extrinsics.size() << std::endl;
+
+        }
+
+        auto end_size = b._extrinsics.size();
+        std::cout << " Final Extrinsic Graph size is " << end_size << std::endl;
+        //REQUIRE(end_size == init_size); TODO doesn't pass yet
+        WARN("TODO: Graph size shall be preserved: init " << init_size << " != final " << end_size);
+    }
+}
