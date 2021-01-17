@@ -128,16 +128,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         //auto init_size = b._streams.size();
         auto initial_extrinsics_size = b._extrinsics.size();
 
-
-        
-
-        // profiles
         rs2::stream_profile mode;
         auto mode_index = 0;
         bool usb3_device = is_usb3(dev);
         int fps = usb3_device ? 30 : 15; // In USB2 Mode the devices will switch to lower FPS rates
         int req_fps = usb3_device ? 60 : 30; // USB2 Mode has only a single resolution for 60 fps which is not sufficient to run the test
-
         do
         {
             REQUIRE(get_mode(dev, &mode, mode_index));
@@ -146,8 +141,17 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
         auto video = mode.as<rs2::video_stream_profile>();
         auto res = configure_all_supported_streams(dev, video.width(), video.height(), mode.fps());
-
+        // 1. check if extrinsics table size is perserved over iterations of same stream type and fps
+        // 2. check if time to first frame exceeds a define threshold :
+        //      - RGB : 1200 msec
+        //      - DEPTH : (should be same as L500)
+        //      - IR : ?
+        // 3. check if there is increment of time to first frame: 
+        //      - throw exception even though the threshold from #2 is not reached
+        //      - run 20 iterations to get to this conclusion
+        
         std::map<std::string, size_t> extrinsic_graph_at_cfg;
+        std::map<std::string, size_t> time_increment_at_cfg;
         for (auto profile : res.second)
         {
             int type = profile.stream;
@@ -180,7 +184,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                         
                         if (!extrinsic_graph_at_cfg.count(cfg_key))
                         {
-                            //initial_extrinsics_size = b._extrinsics.size();
                             extrinsic_graph_at_cfg[cfg_key] = b._extrinsics.size();
                         }
                         std::cout << " Initial Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff <<std::endl;
