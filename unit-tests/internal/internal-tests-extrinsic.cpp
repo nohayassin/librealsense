@@ -126,11 +126,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         auto dev = list.front();
         //auto sens = dev.query_sensors();
 
-        std::map<std::string, size_t> extrinsic_graph_at_sensor;
-        auto& b = environment::get_instance().get_extrinsics_graph();
-        //auto init_size = b._streams.size();
-        auto initial_extrinsics_size = b._extrinsics.size();
-
         rs2::stream_profile mode;
         auto mode_index = 0;
         bool usb3_device = is_usb3(dev);
@@ -161,14 +156,28 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             size_t t1 = 0;
             size_t count = 0;
         };
+
         std::map<std::string, size_t> extrinsic_graph_at_cfg;
         std::map<std::string, time_increment> time_increment_at_cfg;
+        std::map<size_t, size_t> delay_threshold_at_stream_type;
+        
+        // TODO : set correct values for thresholds
+        delay_threshold_at_stream_type[RS2_STREAM_DEPTH] = 6000;
+        delay_threshold_at_stream_type[RS2_STREAM_COLOR] = 6000;
+        delay_threshold_at_stream_type[RS2_STREAM_INFRARED] = 6000;
+        delay_threshold_at_stream_type[RS2_STREAM_FISHEYE] = 6000;
+        delay_threshold_at_stream_type[RS2_STREAM_GYRO] = 6000;
+        delay_threshold_at_stream_type[RS2_STREAM_ACCEL] = 6000;
 
+
+        std::map<std::string, size_t> extrinsic_graph_at_sensor;
+        auto& b = environment::get_instance().get_extrinsics_graph();
 
         for (auto profile : res.second)
         {
             int type = profile.stream;
             int format = profile.format;
+            std::cout << "==================================================================================" << std::endl;
             std::cout << "stream type :" << type << ", index : " << profile.index << ", width : " << profile.width << ", height : " << profile.height << ", format : " << format << ", fps : " << profile.fps << std::endl;
             std::string cfg_key = std::to_string(format) + "," +std::to_string(profile.fps);
             std::cout <<"cfg key :"<< cfg_key <<std::endl;
@@ -191,21 +200,26 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                     {
                         rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
                     }
-                    pipe.stop();
 
                     if (first)
                     {
                         auto t2 = std::chrono::system_clock::now();
                         auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+                        
 
                         // 1. check extrinsics table size
                         if (!extrinsic_graph_at_cfg.count(cfg_key))
                         {
                             extrinsic_graph_at_cfg[cfg_key] = b._extrinsics.size();
+                            std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff << std::endl;
                         }
-                        std::cout << " Initial Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff <<std::endl;
-
-                        // 2. threshold // TODO
+                        else {
+                            std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff << std::endl;
+                            REQUIRE(b._extrinsics.size() == extrinsic_graph_at_cfg[cfg_key]);
+                        }
+                        
+                        // 2. threshold 
+                        REQUIRE(diff < delay_threshold_at_stream_type[profile.stream]);
 
                         // 3. delay increment
                         if (diff > time_increment_at_cfg[cfg_key].t0 && diff > time_increment_at_cfg[cfg_key].t1)
@@ -219,9 +233,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
                         first = false;
                     }
-                    else {
-                        REQUIRE(b._extrinsics.size() == extrinsic_graph_at_cfg[cfg_key]);
-                    }
+                    
+                    pipe.stop();
                 }
                 catch (...)
                 {
