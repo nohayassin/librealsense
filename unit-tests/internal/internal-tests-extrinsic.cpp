@@ -17,6 +17,9 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
+#define TIME_INCREMENT_THRESHOLD 5
+#define ITERATIONS_PER_CONFIG 3
+
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
 {
@@ -149,9 +152,19 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 3. check if there is increment of time to first frame: 
         //      - throw exception even though the threshold from #2 is not reached
         //      - run 20 iterations to get to this conclusion
+        //      - in each iteration check delay against the previous 2 iterations : 
+        //      - if current itration delay > previous 2 iterations delay, increase count by 1
         
+        struct time_increment
+        {
+            size_t t0 = 0;
+            size_t t1 = 0;
+            size_t count = 0;
+        };
         std::map<std::string, size_t> extrinsic_graph_at_cfg;
-        std::map<std::string, size_t> time_increment_at_cfg;
+        std::map<std::string, time_increment> time_increment_at_cfg;
+
+
         for (auto profile : res.second)
         {
             int type = profile.stream;
@@ -159,7 +172,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             std::cout << "stream type :" << type << ", index : " << profile.index << ", width : " << profile.width << ", height : " << profile.height << ", format : " << format << ", fps : " << profile.fps << std::endl;
             std::string cfg_key = std::to_string(format) + "," +std::to_string(profile.fps);
             std::cout <<"cfg key :"<< cfg_key <<std::endl;
-            for (auto i = 0; i < 3; i++)
+            time_increment_at_cfg[cfg_key].count = 0;
+            time_increment_at_cfg[cfg_key].t0 = 0;
+            time_increment_at_cfg[cfg_key].t1 = 0;
+
+            for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
             {
                 rs2::pipeline pipe;
                 rs2::config cfg;
@@ -181,17 +198,29 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                         auto t2 = std::chrono::system_clock::now();
                         auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
 
-                        
+                        // 1. check extrinsics table size
                         if (!extrinsic_graph_at_cfg.count(cfg_key))
                         {
                             extrinsic_graph_at_cfg[cfg_key] = b._extrinsics.size();
                         }
                         std::cout << " Initial Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff <<std::endl;
+
+                        // 2. threshold // TODO
+
+                        // 3. delay increment
+                        if (diff > time_increment_at_cfg[cfg_key].t0 && diff > time_increment_at_cfg[cfg_key].t1)
+                        {
+                            time_increment_at_cfg[cfg_key].count += 1;
+                            REQUIRE(time_increment_at_cfg[cfg_key].count < TIME_INCREMENT_THRESHOLD);
+                        }
+                        // cache only the previous 2 iterations
+                        time_increment_at_cfg[cfg_key].t0 = time_increment_at_cfg[cfg_key].t1;
+                        time_increment_at_cfg[cfg_key].t1 = diff;
+
                         first = false;
                     }
                     else {
                         REQUIRE(b._extrinsics.size() == extrinsic_graph_at_cfg[cfg_key]);
-
                     }
                 }
                 catch (...)
