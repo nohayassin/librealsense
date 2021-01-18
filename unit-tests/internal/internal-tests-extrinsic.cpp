@@ -230,7 +230,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                     time_increment_at_cfg[cfg_key].t0 = time_increment_at_cfg[cfg_key].t1;
                     time_increment_at_cfg[cfg_key].t1 = diff;
 
-
                     pipe.stop();
                 }
                 catch (...)
