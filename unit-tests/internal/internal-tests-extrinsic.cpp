@@ -19,6 +19,7 @@ using namespace librealsense::platform;
 
 #define TIME_INCREMENT_THRESHOLD 5
 #define ITERATIONS_PER_CONFIG 3
+#define DELAY_INCREMENT_THRESHOLD 1
 
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
@@ -170,11 +171,13 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         
         auto frames_per_iteration = 6 * 5;
         rs2::config cfg;
+        size_t cfg_size = 0;
         for (auto profile : res.second)
         {
             if (profile.fps == 200) continue; // TODO : check correct fps for IMU 
             cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
             frames_per_iteration = std::min(frames_per_iteration, profile.fps * 5);
+            cfg_size += 1;
         }
 
         auto& b = environment::get_instance().get_extrinsics_graph();
@@ -250,8 +253,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             }
         }
 
-
-
         std::cout << "Analyzing info ..  " << std::endl;
 
         // the test will succeed only if all 3 conditions are met:
@@ -259,15 +260,49 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 2. no delay increment over iterations
         // 3. "most" iterations have time to first frame delay below a defined threshold
 
+        static const std::string streams[] = { "color", "depth", "ir0", "ir1" };
         CAPTURE(extrinsics_table_size);
         CAPTURE(streams_delay);
         // 1. extrinsics table preserve its size over iterations
         REQUIRE(std::adjacent_find(extrinsics_table_size.begin(), extrinsics_table_size.end(), std::not_equal_to<>()) == extrinsics_table_size.end());
-        // 2. TODO
+        // 2.  no delay increment over iterations - TODO
+        for (auto i = 0; i < cfg_size; i++)
+        {
+            CAPTURE(streams[i]);
+            auto stream = streams[i];
+            auto it = streams_delay[stream].begin();
+            size_t sum_first_delay = 0;
+            size_t sum_last_delay = 0;
+            size_t sum_first_x = 0;
+            size_t sum_last_x = 0;
+            int j = 0;
+            size_t first_size = streams_delay[stream].size() / 2;
+            size_t last_size = streams_delay[stream].size() - first_size;
+            for (; j < streams_delay[stream].size() / 2; j++) {
+                sum_first_delay += *(it + j) < delay_thresholds[stream];
+                sum_first_x += j;
+            }
+            for (; j < streams_delay[stream].size(); j++) {
+                sum_last_delay += *(it + j) < delay_thresholds[stream];
+                sum_last_x += j;
+            }
+
+            float first_delay_avg = sum_first_delay / first_size;
+            float last_delay_avg = sum_last_delay / last_size;
+            float first_x_avg = sum_first_x / first_size;
+            float last_x_avg = sum_last_x / last_size;
+
+            // calc dy/dx
+            auto dy = std::abs(last_delay_avg - first_delay_avg);
+            auto dx = std::abs(last_x_avg - first_x_avg);
+            float dy_dx = dy / dx;
+            CAPTURE(dy_dx);
+            REQUIRE(dy_dx < DELAY_INCREMENT_THRESHOLD); // TODO : set this threshold to fail the test when there is memory leak
+        }
 
         // 3. "most" iterations have time to first frame delay below a defined threshold
-        static const std::string streams[] = { "color", "depth", "ir0", "ir1" };
-        for (auto i = 0; i < 4; i++) 
+        
+        for (auto i = 0; i < cfg_size; i++)
         {
             CAPTURE(streams[i]);
             auto stream = streams[i];
@@ -275,8 +310,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 REQUIRE(*it < delay_thresholds[stream]);
             }
         }
-      
-        // 3.
 
     }
 }
