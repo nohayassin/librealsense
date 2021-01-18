@@ -149,7 +149,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         //      - run 20 iterations to get to this conclusion
         //      - in each iteration check delay against the previous 2 iterations : 
         //      - if current itration delay > previous 2 iterations delay, increase count by 1
-        
+
         struct time_increment
         {
             size_t t0 = 0;
@@ -160,7 +160,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         std::map<std::string, size_t> extrinsic_graph_at_cfg;
         std::map<std::string, time_increment> time_increment_at_cfg;
         std::map<size_t, size_t> delay_threshold_at_stream_type;
-        
+
         // TODO : set correct values for thresholds
         delay_threshold_at_stream_type[RS2_STREAM_DEPTH] = 6000;
         delay_threshold_at_stream_type[RS2_STREAM_COLOR] = 6000;
@@ -179,8 +179,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             int format = profile.format;
             std::cout << "==================================================================================" << std::endl;
             std::cout << "stream type :" << type << ", index : " << profile.index << ", width : " << profile.width << ", height : " << profile.height << ", format : " << format << ", fps : " << profile.fps << std::endl;
-            std::string cfg_key = std::to_string(format) + "," +std::to_string(profile.fps);
-            std::cout <<"cfg key :"<< cfg_key <<std::endl;
+            std::string cfg_key = std::to_string(format) + "," + std::to_string(profile.fps);
+            std::cout << "cfg key :" << cfg_key << std::endl;
             time_increment_at_cfg[cfg_key].count = 0;
             time_increment_at_cfg[cfg_key].t0 = 0;
             time_increment_at_cfg[cfg_key].t1 = 0;
@@ -192,7 +192,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps);
                 pipe.start(cfg);
                 auto frames_per_iteration = profile.fps * 5;
-                bool first = true;
+
                 try
                 {
                     auto t1 = std::chrono::system_clock::now();
@@ -201,39 +201,36 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                         rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
                     }
 
-                    if (first)
+                    auto t2 = std::chrono::system_clock::now();
+                    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
+
+
+                    // 1. check extrinsics table size
+                    if (!extrinsic_graph_at_cfg.count(cfg_key))
                     {
-                        auto t2 = std::chrono::system_clock::now();
-                        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-                        
-
-                        // 1. check extrinsics table size
-                        if (!extrinsic_graph_at_cfg.count(cfg_key))
-                        {
-                            extrinsic_graph_at_cfg[cfg_key] = b._extrinsics.size();
-                            std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff << std::endl;
-                        }
-                        else {
-                            std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff << std::endl;
-                            REQUIRE(b._extrinsics.size() == extrinsic_graph_at_cfg[cfg_key]);
-                        }
-                        
-                        // 2. threshold 
-                        REQUIRE(diff < delay_threshold_at_stream_type[profile.stream]);
-
-                        // 3. delay increment
-                        if (diff > time_increment_at_cfg[cfg_key].t0 && diff > time_increment_at_cfg[cfg_key].t1)
-                        {
-                            time_increment_at_cfg[cfg_key].count += 1;
-                            REQUIRE(time_increment_at_cfg[cfg_key].count < TIME_INCREMENT_THRESHOLD);
-                        }
-                        // cache only the previous 2 iterations
-                        time_increment_at_cfg[cfg_key].t0 = time_increment_at_cfg[cfg_key].t1;
-                        time_increment_at_cfg[cfg_key].t1 = diff;
-
-                        first = false;
+                        extrinsic_graph_at_cfg[cfg_key] = b._extrinsics.size();
+                        std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff;// << std::endl;
                     }
-                    
+                    else {
+                        std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff;// << std::endl;
+                        REQUIRE(b._extrinsics.size() == extrinsic_graph_at_cfg[cfg_key]);
+                    }
+
+                    // 2. threshold 
+                    REQUIRE(diff < delay_threshold_at_stream_type[profile.stream]);
+
+                    // 3. delay increment
+                    if (diff > time_increment_at_cfg[cfg_key].t0 && diff > time_increment_at_cfg[cfg_key].t1)
+                    {
+                        time_increment_at_cfg[cfg_key].count += 1;
+                        REQUIRE(time_increment_at_cfg[cfg_key].count < TIME_INCREMENT_THRESHOLD);
+                    }
+                    std::cout << ", increment count is: " << time_increment_at_cfg[cfg_key].count << std::endl;
+                    // cache only previous 2 iterations
+                    time_increment_at_cfg[cfg_key].t0 = time_increment_at_cfg[cfg_key].t1;
+                    time_increment_at_cfg[cfg_key].t1 = diff;
+
+
                     pipe.stop();
                 }
                 catch (...)
