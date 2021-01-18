@@ -151,8 +151,9 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 3. "most" iterations have time to first frame delay below a defined threshold
 
 
-        std::map<std::string, std::vector<size_t>> extrinsic_graph_at_cfg;
-        std::map<std::string, std::vector<size_t>> time_increment_at_cfg; // map to vector to collect all data
+        //std::map<std::string, std::vector<size_t>> extrinsics_size_at_cfg;
+        std::vector<size_t> extrinsics_size_at_cfg;
+        std::map<std::string, std::vector<size_t>> streams_delay; // map to vector to collect all data
         std::map<size_t, size_t> delay_threshold_at_stream_type;
 
         // TODO : set correct values for thresholds (take threshold of fps=6)
@@ -166,9 +167,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
         auto& b = environment::get_instance().get_extrinsics_graph();
+        auto frames_per_iteration = 6 * 5;
         rs2::config cfg;
         for (auto profile : res.second)
         {
+            if (profile.fps == 200) continue;
             cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
 
             int type = profile.stream;
@@ -178,11 +181,10 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             std::string cfg_key = std::to_string(format) + "," + std::to_string(profile.fps);
             std::cout << "cfg key :" << cfg_key << std::endl;
 
-            //frames_per_iter_at_cfg[cfg_key] = profile.fps * 5;
+            frames_per_iteration = std::min(frames_per_iteration, profile.fps * 5);
         }
-        //for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
-        auto frames_per_iteration = 30 * 5; // fps*5
-        while (1) // break only when collecting 20 iterations for each stream (cfg)
+        for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
+        //while (1) // break only when collecting 20 iterations for each stream (cfg)
         {
             rs2::config tmp_cfg = cfg;
             rs2::pipeline pipe;
@@ -197,17 +199,33 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 {
                     data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
                 }
-                //data.fp
-                auto t2 = std::chrono::system_clock::now();
-                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
 
-                auto color_frame = data.get_color_frame();
-                auto depth_frame = data.get_depth_frame();
-                auto ir_frame = data.get_infrared_frame();
-                auto fisheye_frame = data.get_fisheye_frame();
-                auto sensor = data.get_sensor();
-                auto profile = data.get_profile();
-                // 1. check extrinsics table size
+                auto t2 = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
+                // find the correct units for t1 and timestamp to save only the diff in map
+                if (data.get_color_frame()) streams_delay["color"].push_back(data.get_color_frame().get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
+                if (data.get_depth_frame()) streams_delay["depth"].push_back(data.get_depth_frame().get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
+                if (data.get_infrared_frame()) streams_delay["ir"].push_back(data.get_infrared_frame().get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
+                if (data.get_fisheye_frame()) streams_delay["imu"].push_back(data.get_fisheye_frame().get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
+                    
+
+
+                extrinsics_size_at_cfg.push_back(b._extrinsics.size());
+
+                
+                pipe.stop();
+            }
+            catch (...)
+            {
+                std::cout << "Iteration failed  " << std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+
+
+        std::cout << "NOHA XXX  " << std::endl;
+        // go over the collected data and check the 3 conditions:
+        // 1. check extrinsics table size
                /* if (!extrinsic_graph_at_cfg.count(cfg_key))
                 {
                     extrinsic_graph_at_cfg[cfg_key] = b._extrinsics.size();
@@ -218,7 +236,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                     REQUIRE(b._extrinsics.size() == extrinsic_graph_at_cfg[cfg_key]);
                 }
 
-                // 2. threshold 
+                // 2. threshold
                 REQUIRE(diff < delay_threshold_at_stream_type[profile.stream]);
 
                 // 3. delay increment
@@ -232,13 +250,5 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 time_increment_at_cfg[cfg_key].t0 = time_increment_at_cfg[cfg_key].t1;
                 time_increment_at_cfg[cfg_key].t1 = diff;
                 */
-                pipe.stop();
-            }
-            catch (...)
-            {
-                std::cout << "Iteration failed  " << std::endl;
-                exit(EXIT_FAILURE);
-            }
-        }
     }
 }
