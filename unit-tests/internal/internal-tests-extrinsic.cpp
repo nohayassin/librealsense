@@ -150,69 +150,97 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 2. no delay increment over iterations
         // 3. "most" iterations have time to first frame delay below a defined threshold
 
-
-        //std::map<std::string, std::vector<size_t>> extrinsics_size_at_cfg;
-        std::vector<size_t> extrinsics_size_at_cfg;
+        std::vector<size_t> extrinsics_table_size;
         std::map<std::string, std::vector<size_t>> streams_delay; // map to vector to collect all data
-        std::map<size_t, size_t> delay_threshold_at_stream_type;
+        //std::map<size_t, size_t> delay_threshold_at_stream_type;
+        std::map<std::string, size_t> delay_thresholds;
+        std::map<std::string, std::vector<size_t>> frame_number;
+        
 
         // TODO : set correct values for thresholds (take threshold of fps=6)
-        delay_threshold_at_stream_type[RS2_STREAM_DEPTH] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_COLOR] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_INFRARED] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_FISHEYE] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_GYRO] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_ACCEL] = 6000;
+        delay_thresholds["color"] = 6000;
+        delay_thresholds["depth"] = 6000;
+        delay_thresholds["ir0"]   = 6000;
+        delay_thresholds["ir1"]   = 6000;
+        delay_thresholds["accel"] = 6000;
+        delay_thresholds["gyro"]  = 6000;
 
 
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
-        auto& b = environment::get_instance().get_extrinsics_graph();
+        
         auto frames_per_iteration = 6 * 5;
         rs2::config cfg;
         for (auto profile : res.second)
         {
-            if (profile.fps == 200) continue;
+            if (profile.fps == 200) continue; // TODO : check correct fps for IMU 
             cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
-
-            int type = profile.stream;
-            int format = profile.format;
-            std::cout << "==================================================================================" << std::endl;
-            std::cout << "stream type :" << type << ", index : " << profile.index << ", width : " << profile.width << ", height : " << profile.height << ", format : " << format << ", fps : " << profile.fps << std::endl;
-            std::string cfg_key = std::to_string(format) + "," + std::to_string(profile.fps);
-            std::cout << "cfg key :" << cfg_key << std::endl;
-
             frames_per_iteration = std::min(frames_per_iteration, profile.fps * 5);
         }
+
+        auto& b = environment::get_instance().get_extrinsics_graph();
         for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
-        //while (1) // break only when collecting 20 iterations for each stream (cfg)
         {
+            
             rs2::config tmp_cfg = cfg;
             rs2::pipeline pipe;
             rs2::frameset data;
             pipe.start(tmp_cfg);
-
+           
+            struct new_frames
+            {
+                bool color = false;
+                bool depth = false;
+                bool ir0 = false;
+                bool ir1 = false;
+                //bool accel = false;
+                //bool gyro = false;
+            };
+            new_frames new_frames_arrival;
             try
             {
-                auto t1 = std::chrono::system_clock::now();
+                
                 // TODO : use callback for this
                 for (auto i = 0; i < frames_per_iteration; i++)
                 {
+                    auto t1 = std::chrono::system_clock::now().time_since_epoch();
+                    auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
+
                     data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+
+                    // check if frame is new according to its frame number
+                    // if condition is met, it means we got a new frame
+                    if (!new_frames_arrival.color && (std::find(frame_number["color"].begin(), frame_number["color"].end(), data.get_color_frame().get_frame_number()) == frame_number["color"].end()))
+                    {
+                        frame_number["color"].push_back(data.get_color_frame().get_frame_number());
+                        streams_delay["color"].push_back(data.get_color_frame().get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
+                        new_frames_arrival.color = true;
+                    }
+                    if (!new_frames_arrival.depth && (std::find(frame_number["depth"].begin(), frame_number["depth"].end(), data.get_depth_frame().get_frame_number()) == frame_number["depth"].end()))
+                    {
+                        frame_number["depth"].push_back(data.get_depth_frame().get_frame_number());
+                        streams_delay["depth"].push_back(data.get_depth_frame().get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
+                        new_frames_arrival.depth = true;
+                    }
+                    if (!new_frames_arrival.ir0 && (std::find(frame_number["ir0"].begin(), frame_number["ir0"].end(), data.get_infrared_frame(0).get_frame_number()) == frame_number["ir0"].end()))
+                    {
+                        frame_number["ir0"].push_back(data.get_infrared_frame(0).get_frame_number());
+                        streams_delay["ir0"].push_back(data.get_infrared_frame(0).get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
+                        new_frames_arrival.ir0 = true;
+                    }
+                    if (!new_frames_arrival.ir1 && (std::find(frame_number["ir1"].begin(), frame_number["ir1"].end(), data.get_infrared_frame(0).get_frame_number()) == frame_number["ir1"].end()))
+                    {
+                        frame_number["ir1"].push_back(data.get_infrared_frame(0).get_frame_number());
+                        streams_delay["ir1"].push_back(data.get_infrared_frame(0).get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
+                        new_frames_arrival.ir1 = true;
+                    }
+                    if (new_frames_arrival.color && new_frames_arrival.depth && new_frames_arrival.ir0 && new_frames_arrival.ir1) break;
+
+                    //TODO :for ACCEL and GYRO check correct fps in rs-enumerate-device tool
+                    
                 }
 
-                auto t2 = std::chrono::system_clock::now();
-                auto diff = std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count();
-                // find the correct units for t1 and timestamp to save only the diff in map
-                if (data.get_color_frame()) streams_delay["color"].push_back(data.get_color_frame().get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
-                if (data.get_depth_frame()) streams_delay["depth"].push_back(data.get_depth_frame().get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
-                if (data.get_infrared_frame()) streams_delay["ir"].push_back(data.get_infrared_frame().get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
-                if (data.get_fisheye_frame()) streams_delay["imu"].push_back(data.get_fisheye_frame().get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
-                    
+                extrinsics_table_size.push_back(b._extrinsics.size());
 
-
-                extrinsics_size_at_cfg.push_back(b._extrinsics.size());
-
-                
                 pipe.stop();
             }
             catch (...)
@@ -223,32 +251,32 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         }
 
 
-        std::cout << "NOHA XXX  " << std::endl;
-        // go over the collected data and check the 3 conditions:
-        // 1. check extrinsics table size
-               /* if (!extrinsic_graph_at_cfg.count(cfg_key))
-                {
-                    extrinsic_graph_at_cfg[cfg_key] = b._extrinsics.size();
-                    std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff;// << std::endl;
-                }
-                else {
-                    std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff;// << std::endl;
-                    REQUIRE(b._extrinsics.size() == extrinsic_graph_at_cfg[cfg_key]);
-                }
 
-                // 2. threshold
-                REQUIRE(diff < delay_threshold_at_stream_type[profile.stream]);
+        std::cout << "Analyzing info ..  " << std::endl;
 
-                // 3. delay increment
-                if (diff > time_increment_at_cfg[cfg_key].t0 && diff > time_increment_at_cfg[cfg_key].t1)
-                {
-                    time_increment_at_cfg[cfg_key].count += 1;
-                    REQUIRE(time_increment_at_cfg[cfg_key].count < TIME_INCREMENT_THRESHOLD);
-                }
-                std::cout << ", increment count is: " << time_increment_at_cfg[cfg_key].count << std::endl;
-                // cache only previous 2 iterations
-                time_increment_at_cfg[cfg_key].t0 = time_increment_at_cfg[cfg_key].t1;
-                time_increment_at_cfg[cfg_key].t1 = diff;
-                */
+        // the test will succeed only if all 3 conditions are met:
+        // 1. extrinsics table size is perserved over iterations for each stream 
+        // 2. no delay increment over iterations
+        // 3. "most" iterations have time to first frame delay below a defined threshold
+
+        CAPTURE(extrinsics_table_size);
+        CAPTURE(streams_delay);
+        // 1. extrinsics table preserve its size over iterations
+        REQUIRE(std::adjacent_find(extrinsics_table_size.begin(), extrinsics_table_size.end(), std::not_equal_to<>()) == extrinsics_table_size.end());
+        // 2. TODO
+
+        // 3. "most" iterations have time to first frame delay below a defined threshold
+        static const std::string streams[] = { "color", "depth", "ir0", "ir1" };
+        for (auto i = 0; i < 4; i++) 
+        {
+            CAPTURE(streams[i]);
+            auto stream = streams[i];
+            for (auto it = streams_delay[stream].begin(); it != streams_delay[stream].end(); ++it) {
+                REQUIRE(*it < delay_thresholds[stream]);
+            }
+        }
+      
+        // 3.
+
     }
 }
