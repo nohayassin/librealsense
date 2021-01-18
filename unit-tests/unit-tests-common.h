@@ -109,7 +109,7 @@ inline std::vector<profile>  configure_all_supported_streams(rs2::sensor& sensor
         { RS2_STREAM_INFRARED,  RS2_FORMAT_Y8,            width, height,    0, fps},
         { RS2_STREAM_CONFIDENCE,RS2_FORMAT_RAW8,          width, height,    0, fps},
         { RS2_STREAM_FISHEYE,   RS2_FORMAT_RAW8,          width, height,    0, fps},
-        { RS2_STREAM_ACCEL,     RS2_FORMAT_MOTION_XYZ32F,   1,      1,      0, 200},
+        { RS2_STREAM_ACCEL,     RS2_FORMAT_MOTION_XYZ32F,   1,      1,      0, 250},
         { RS2_STREAM_GYRO,      RS2_FORMAT_MOTION_XYZ32F,   1,      1,      0, 200},
     };
 

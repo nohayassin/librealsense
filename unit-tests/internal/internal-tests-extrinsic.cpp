@@ -19,7 +19,7 @@ using namespace librealsense::platform;
 
 #define TIME_INCREMENT_THRESHOLD 5
 #define ITERATIONS_PER_CONFIG 3
-#define DELAY_INCREMENT_THRESHOLD 1
+#define DELAY_INCREMENT_THRESHOLD 1.0f
 
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
@@ -174,7 +174,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         size_t cfg_size = 0;
         for (auto profile : res.second)
         {
-            if (profile.fps == 200) continue; // TODO : check correct fps for IMU 
+            //if (profile.fps == 200) continue; // TODO : check correct fps for IMU 
             cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
             frames_per_iteration = std::min(frames_per_iteration, profile.fps * 5);
             cfg_size += 1;
@@ -195,8 +195,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 bool depth = false;
                 bool ir0 = false;
                 bool ir1 = false;
-                //bool accel = false;
-                //bool gyro = false;
+                bool accel = false;
+                bool gyro = false;
             };
             new_frames new_frames_arrival;
             try
@@ -236,6 +236,23 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                         streams_delay["ir1"].push_back(data.get_infrared_frame(0).get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
                         new_frames_arrival.ir1 = true;
                     }
+                    
+                    auto accel = data.first_or_default(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
+                    auto gyro = data.first_or_default(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
+                    if (!new_frames_arrival.accel && (std::find(frame_number["accel"].begin(), frame_number["accel"].end(), accel.get_frame_number()) == frame_number["accel"].end()))
+                    {
+                        frame_number["accel"].push_back(accel.get_frame_number());
+                        streams_delay["accel"].push_back(accel.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
+                        new_frames_arrival.accel = true;
+                    }
+                    if (!new_frames_arrival.gyro && (std::find(frame_number["gyro"].begin(), frame_number["gyro"].end(), gyro.get_frame_number()) == frame_number["gyro"].end()))
+                    {
+                        frame_number["gyro"].push_back(accel.get_frame_number());
+                        streams_delay["gyro"].push_back(accel.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
+                        new_frames_arrival.gyro = true;
+                    }
+
+
                     if (new_frames_arrival.color && new_frames_arrival.depth && new_frames_arrival.ir0 && new_frames_arrival.ir1) break;
 
                     //TODO :for ACCEL and GYRO check correct fps in rs-enumerate-device tool
@@ -260,7 +277,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 2. no delay increment over iterations
         // 3. "most" iterations have time to first frame delay below a defined threshold
 
-        static const std::string streams[] = { "color", "depth", "ir0", "ir1" };
+        static const std::string streams[] = { "color", "depth", "ir0", "ir1", "accel", "gyro" };
         CAPTURE(extrinsics_table_size);
         CAPTURE(streams_delay);
         // 1. extrinsics table preserve its size over iterations
@@ -286,7 +303,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 sum_last_delay += *(it + j) < delay_thresholds[stream];
                 sum_last_x += j;
             }
-
+            REQUIRE(first_size > 0);
+            REQUIRE(last_size > 0);
             float first_delay_avg = sum_first_delay / first_size;
             float last_delay_avg = sum_last_delay / last_size;
             float first_x_avg = sum_first_x / first_size;
