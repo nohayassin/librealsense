@@ -18,7 +18,7 @@ using namespace librealsense;
 using namespace librealsense::platform;
 
 #define TIME_INCREMENT_THRESHOLD 5
-#define ITERATIONS_PER_CONFIG 3
+#define ITERATIONS_PER_CONFIG 10
 #define DELAY_INCREMENT_THRESHOLD 1.0f
 
 // Require that vector is exactly the zero vector
