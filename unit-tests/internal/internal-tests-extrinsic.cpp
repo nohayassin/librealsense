@@ -153,7 +153,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
         std::vector<size_t> extrinsics_table_size;
         std::map<std::string, std::vector<size_t>> streams_delay; // map to vector to collect all data
-        //std::map<size_t, size_t> delay_threshold_at_stream_type;
+        std::map<std::string, std::vector<std::map<unsigned long long, size_t >>> unique_streams_delay;
         std::map<std::string, size_t> delay_thresholds;
         std::map<std::string, std::vector<unsigned long long>> frame_number;
         std::map<std::string, bool> new_frame;
@@ -189,24 +189,17 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             rs2::frameset frames;
             pipe.start(tmp_cfg);
            
-            /*struct new_frames
-            {
-                bool color = false;
-                bool depth = false;
-                bool ir0 = false;
-                bool ir1 = false;
-                bool accel = false;
-                bool gyro = false;
-            };
-            new_frames new_frames_arrival;*/
-
-            
             try
             {
-                
+                for (auto it = new_frame.begin(); it != new_frame.end(); it++)
+                {
+                    it->second = false;
+                }
                 // TODO : use callback for this
-                for (auto i = 0; i < frames_per_iteration; i++)
-                //while(counter_per_stream == 20) // FW issue..
+                // to prevent FW issue, at least 20 frames per stream should arrive
+                bool condition = false;
+                std::map<std::string, size_t> frames_count_per_stream;
+                while(!condition) // the condition is set to true when at least 20 frames are received per stream
                 {
                     auto t1 = std::chrono::system_clock::now().time_since_epoch();
                     auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
@@ -217,16 +210,32 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                         auto stream_type = f.get_profile().stream_name();
                         auto frame_num = f.get_frame_number();
                         auto time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
-                        if (!new_frame[stream_type] && (std::find(frame_number[stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end()))
+                        
+                        if (!new_frame[stream_type] )
                         {
-                            frame_number[stream_type].push_back(frame_num);
-                            streams_delay[stream_type].push_back(time_of_arrival  - milli);
-                            new_frame[stream_type] = true;
+                            frames_count_per_stream[stream_type] = 1;
+                            if (std::find(frame_number[stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end())
+                            {
+                                frame_number[stream_type].push_back(frame_num);
+                                streams_delay[stream_type].push_back(time_of_arrival - milli);
+                                new_frame[stream_type] = true;
+                            }
+                        }
+                        else
+                        {
+                            frames_count_per_stream[stream_type] += 1;
                         }
                     }
-
+                    if (frames_count_per_stream.size() == res.second.size())
+                    {
+                        for (auto it = frames_count_per_stream.begin(); it != frames_count_per_stream.end(); it++)
+                        {
+                            if (it->second < 20) break;
+                        }
+                        // all streams received more than 20 frames
+                        condition = true;
+                    }
                 }
-
                 pipe.stop();
                 extrinsics_table_size.push_back(b._extrinsics.size());
             }
