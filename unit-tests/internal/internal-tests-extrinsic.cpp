@@ -13,18 +13,6 @@
 #include "./../src/environment.h"
 
 #include <unit-tests-common.h>
-//#include <librealsense2/hpp/rs_frame.hpp>
-
-#include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
-#include <librealsense2/hpp/rs_internal.hpp>
-//#include "./../examples/example.hpp"
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <./../third-party/stb_image_write.h>
-#include <./../common/res/int-rs-splash.hpp>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include <./../third-party/stb_image.h>
 
 using namespace librealsense;
 using namespace librealsense::platform;
@@ -37,14 +25,31 @@ using namespace librealsense::platform;
 {
     for (int i = 1; i < 3; ++i) REQUIRE(vector[i] == 0.0f);
 }
-
 // Require that matrix is exactly the identity matrix
 inline void require_identity_matrix(const float(&matrix)[9])
 {
     static const float identity_matrix_3x3[] = { 1,0,0, 0,1,0, 0,0,1 };
     for (int i = 0; i < 9; ++i) REQUIRE(matrix[i] == approx(identity_matrix_3x3[i]));
+}*/
+bool get_mode(rs2::device& dev, rs2::stream_profile* profile, int mode_index = 0)
+{
+    auto sensors = dev.query_sensors();
+    REQUIRE(sensors.size() > 0);
+
+    for (auto i = 0; i < sensors.size(); i++)
+    {
+        auto modes = sensors[i].get_stream_profiles();
+        REQUIRE(modes.size() > 0);
+
+        if (mode_index >= modes.size())
+            continue;
+
+        *profile = modes[mode_index];
+        return true;
+    }
+    return false;
 }
-*/
+
 TEST_CASE("Extrinsic graph management", "[live][multicam]")
 {
     // Require at least one device to be plugged in
@@ -84,14 +89,14 @@ TEST_CASE("Extrinsic graph management", "[live][multicam]")
                     else
                         extrinsic_graph_at_sensor[snr_id] = b._streams.size();
 
-//                    std::cout << __LINE__ << " " << snr.get_info(RS2_CAMERA_INFO_NAME) <<" : Extrinsic graph map size is " << b._streams.size() << std::endl;
+                    //                    std::cout << __LINE__ << " " << snr.get_info(RS2_CAMERA_INFO_NAME) <<" : Extrinsic graph map size is " << b._streams.size() << std::endl;
 
                     rs2_extrinsics extrin{};
                     try {
                         auto prof = profs[0];
                         extrin = prof.get_extrinsics_to(prof);
                     }
-                    catch (const rs2::error &e) {
+                    catch (const rs2::error& e) {
                         // if device isn't calibrated, get_extrinsics must error out (according to old comment. Might not be true under new API)
                         WARN(e.what());
                         continue;
@@ -108,25 +113,6 @@ TEST_CASE("Extrinsic graph management", "[live][multicam]")
         //REQUIRE(end_size == init_size); TODO doesn't pass yet
         WARN("TODO: Graph size shall be preserved: init " << init_size << " != final " << end_size);
     }
-}
-
-bool get_mode(rs2::device& dev, rs2::stream_profile* profile, int mode_index = 0)
-{
-    auto sensors = dev.query_sensors();
-    REQUIRE(sensors.size() > 0);
-
-    for (auto i = 0; i < sensors.size(); i++)
-    {
-        auto modes = sensors[i].get_stream_profiles();
-        REQUIRE(modes.size() > 0);
-
-        if (mode_index >= modes.size())
-            continue;
-
-        *profile = modes[mode_index];
-        return true;
-    }
-    return false;
 }
 TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 {
