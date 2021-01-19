@@ -171,14 +171,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
         
-        //auto frames_per_iteration = 6 * 5;
         rs2::config cfg;
         size_t cfg_size = 0;
         for (auto profile : res.second)
         {
-            //if (profile.fps == 200) continue; // TODO : check correct fps for IMU 
             cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
-            //frames_per_iteration = std::min(frames_per_iteration, profile.fps * 5);
             cfg_size += 1;
         }
 
@@ -197,7 +194,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 {
                     it->second = 0;
                 }
-                // TODO : use callback for this
                 // to prevent FW issue, at least 20 frames per stream should arrive
                 bool condition = false;
                 std::map<std::string, size_t> frames_count_per_stream;
@@ -236,7 +232,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                             }
                         }
                         // all streams received more than 20 frames
-                        
                     }
                 }
                 pipe.stop();
@@ -245,7 +240,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             catch (...)
             {
                 std::cout << "Iteration failed  " << std::endl;
-                //exit(EXIT_FAILURE);
             }
         }
 
@@ -280,7 +274,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             double stdev = std::sqrt(sq_sum / v.size());
 
             std::vector<double> stdev_diff(v.size());
-            //std::transform(v.begin(), v.end(), stdev_diff.begin(), std::bind2nd(std::minus<double>(), stdev));
             auto v_size = v.size();
             std::transform(v.begin(), v.end(), stdev_diff.begin(), [stdev, v_size](double d) {
                 d =  d < 0 ? -d : d;
@@ -297,7 +290,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 filtered_delay.push_back(*(v_it + i));
             }
             streams_delay[stream.first] = filtered_delay;
-            std::cout << "NOHA "<<std::endl;
         }
         for (const auto& stream : streams_delay)
         {
@@ -336,7 +328,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             auto dx = std::abs(last_x_avg - first_x_avg);
             float dy_dx = dy / dx;
             CAPTURE(dy_dx);
-            /// change to %
+            /// TODO change to %
             CHECK(dy_dx < DELAY_INCREMENT_THRESHOLD); // TODO : set this threshold to fail the test when there is memory leak
         }
 
