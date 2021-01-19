@@ -13,6 +13,8 @@
 #include "./../src/environment.h"
 
 #include <unit-tests-common.h>
+#include <numeric>
+#include <stdlib.h> 
 
 using namespace librealsense;
 using namespace librealsense::platform;
@@ -156,7 +158,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         std::map<std::string, std::vector<std::map<unsigned long long, size_t >>> unique_streams_delay;
         std::map<std::string, size_t> delay_thresholds;
         std::map<std::string, std::vector<unsigned long long>> frame_number;
-        std::map<std::string, bool> new_frame;
+        std::map<std::string, size_t> new_frame;
 
         // TODO : set correct values for thresholds (take threshold of fps=6)
         delay_thresholds["color"] = 6000;
@@ -193,7 +195,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             {
                 for (auto it = new_frame.begin(); it != new_frame.end(); it++)
                 {
-                    it->second = false;
+                    it->second = 0;
                 }
                 // TODO : use callback for this
                 // to prevent FW issue, at least 20 frames per stream should arrive
@@ -210,30 +212,31 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                         auto stream_type = f.get_profile().stream_name();
                         auto frame_num = f.get_frame_number();
                         auto time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
-                        
-                        if (!new_frame[stream_type] )
+
+                        if (std::find(frame_number[stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end())
                         {
-                            frames_count_per_stream[stream_type] = 1;
-                            if (std::find(frame_number[stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end())
+                            if (!new_frame[stream_type])
                             {
                                 frame_number[stream_type].push_back(frame_num);
                                 streams_delay[stream_type].push_back(time_of_arrival - milli);
                                 new_frame[stream_type] = true;
                             }
-                        }
-                        else
-                        {
-                            frames_count_per_stream[stream_type] += 1;
+                            new_frame[stream_type] += 1;
                         }
                     }
-                    if (frames_count_per_stream.size() == res.second.size())
+                    if (new_frame.size() == res.second.size())
                     {
-                        for (auto it = frames_count_per_stream.begin(); it != frames_count_per_stream.end(); it++)
+                        condition = true;
+                        for (auto it = new_frame.begin(); it != new_frame.end(); it++)
                         {
-                            if (it->second < 20) break;
+                            if (it->second < 20)
+                            {
+                                condition = false;
+                                break;
+                            }
                         }
                         // all streams received more than 20 frames
-                        condition = true;
+                        
                     }
                 }
                 pipe.stop();
@@ -253,16 +256,41 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 2. no delay increment over iterations
         // 3. "most" iterations have time to first frame delay below a defined threshold
 
-        static const std::string streams[] = { "color", "depth", "ir0", "ir1", "accel", "gyro" };
+        //static const std::string streams[] = { "color", "depth", "ir0", "ir1", "accel", "gyro" };
         CAPTURE(extrinsics_table_size);
         CAPTURE(streams_delay);
         // 1. extrinsics table preserve its size over iterations
         CHECK(std::adjacent_find(extrinsics_table_size.begin(), extrinsics_table_size.end(), std::not_equal_to<>()) == extrinsics_table_size.end());
-        // 2.  no delay increment over iterations - TODO
-        for (auto i = 0; i < cfg_size; i++)
+        // 2.  no delay increment over iterations 
+        // filter spikes
+        for (const auto& stream : streams_delay)
         {
-            CAPTURE(streams[i]);
-            auto stream = streams[i];
+            auto v = stream.second;
+            double sum = std::accumulate(v.begin(), v.end(), 0.0);
+            double mean = sum / v.size();
+
+            std::vector<double> diff(v.size());
+            std::transform(v.begin(), v.end(), diff.begin(), std::bind2nd(std::minus<double>(), mean));
+            double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+            double stdev = std::sqrt(sq_sum / v.size());
+
+            std::vector<double> stdev_diff(v.size());
+            std::transform(v.begin(), v.end(), stdev_diff.begin(), std::bind2nd(std::minus<double>(), stdev));
+
+           /* std::transform(v.begin(), v.end(), stdev_diff.begin(), [stdev](size_t d) {
+                d = -d ? d < 0 : d;
+                auto val = d - stdev;
+                return val ? val > 0 : -val;
+                }
+            , stdev);*/
+ 
+            std::cout << "NOHA "<<std::endl;
+        }
+        // check if increment percentage is below a threshold [%]
+        for (const auto& stream_ : streams_delay)
+        {
+            CAPTURE(stream_);
+            auto stream = stream_.first; 
             auto it = streams_delay[stream].begin();
             size_t sum_first_delay = 0;
             size_t sum_last_delay = 0;
@@ -297,10 +325,10 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
         // 3. "most" iterations have time to first frame delay below a defined threshold
         
-        for (auto i = 0; i < cfg_size; i++)
+        for (const auto& stream_ : streams_delay)
         {
-            CAPTURE(streams[i]);
-            auto stream = streams[i];
+            auto stream = stream_.first;
+            CAPTURE(stream);
             for (auto it = streams_delay[stream].begin(); it != streams_delay[stream].end(); ++it) {
                 CHECK(*it < delay_thresholds[stream]);
             }
