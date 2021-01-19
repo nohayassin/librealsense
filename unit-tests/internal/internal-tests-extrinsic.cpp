@@ -20,8 +20,9 @@ using namespace librealsense;
 using namespace librealsense::platform;
 
 #define TIME_INCREMENT_THRESHOLD 5
-#define ITERATIONS_PER_CONFIG 10
+#define ITERATIONS_PER_CONFIG 15
 #define DELAY_INCREMENT_THRESHOLD 1.0f
+#define SPIKE_THRESHOLD 5
 
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
@@ -154,31 +155,30 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 3. "most" iterations have time to first frame delay below a defined threshold
 
         std::vector<size_t> extrinsics_table_size;
-        std::map<std::string, std::vector<size_t>> streams_delay; // map to vector to collect all data
+        std::map<std::string, std::vector<double>> streams_delay; // map to vector to collect all data
         std::map<std::string, std::vector<std::map<unsigned long long, size_t >>> unique_streams_delay;
-        std::map<std::string, size_t> delay_thresholds;
+        std::map<std::string, double> delay_thresholds;
         std::map<std::string, std::vector<unsigned long long>> frame_number;
         std::map<std::string, size_t> new_frame;
 
         // TODO : set correct values for thresholds (take threshold of fps=6)
-        delay_thresholds["color"] = 6000;
-        delay_thresholds["depth"] = 6000;
-        delay_thresholds["ir0"]   = 6000;
-        delay_thresholds["ir1"]   = 6000;
-        delay_thresholds["accel"] = 6000;
-        delay_thresholds["gyro"]  = 6000;
-
+        delay_thresholds["Accel"] = 1000; // ms
+        delay_thresholds["Color"] = 1000; // ms
+        delay_thresholds["Depth"] = 1000; // ms
+        delay_thresholds["Gyro"] = 1000; // ms
+        delay_thresholds["Infrared 1"] = 1000; // ms
+        delay_thresholds["Infrared 2"] = 1000; // ms
 
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
         
-        auto frames_per_iteration = 6 * 5;
+        //auto frames_per_iteration = 6 * 5;
         rs2::config cfg;
         size_t cfg_size = 0;
         for (auto profile : res.second)
         {
             //if (profile.fps == 200) continue; // TODO : check correct fps for IMU 
             cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
-            frames_per_iteration = std::min(frames_per_iteration, profile.fps * 5);
+            //frames_per_iteration = std::min(frames_per_iteration, profile.fps * 5);
             cfg_size += 1;
         }
 
@@ -250,6 +250,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         }
 
         std::cout << "Analyzing info ..  " << std::endl;
+        // before analyzing make sure we have enough data
+        for (const auto& stream : streams_delay)
+        {
+            REQUIRE(stream.second.size() > 3);
+        }
 
         // the test will succeed only if all 3 conditions are met:
         // 1. extrinsics table size is perserved over iterations for each stream 
@@ -275,16 +280,28 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             double stdev = std::sqrt(sq_sum / v.size());
 
             std::vector<double> stdev_diff(v.size());
-            std::transform(v.begin(), v.end(), stdev_diff.begin(), std::bind2nd(std::minus<double>(), stdev));
-
-           /* std::transform(v.begin(), v.end(), stdev_diff.begin(), [stdev](size_t d) {
-                d = -d ? d < 0 : d;
-                auto val = d - stdev;
-                return val ? val > 0 : -val;
+            //std::transform(v.begin(), v.end(), stdev_diff.begin(), std::bind2nd(std::minus<double>(), stdev));
+            auto v_size = v.size();
+            std::transform(v.begin(), v.end(), stdev_diff.begin(), [stdev, v_size](double d) {
+                d =  d < 0 ? -d : d;
+                auto val = (d - stdev)/ v_size;
+                return val > 0 ? val : -val;
                 }
-            , stdev);*/
- 
+            );
+            auto stdev_diff_it = stdev_diff.begin();
+            auto v_it = v.begin();
+            std::vector<double> filtered_delay;
+            for (auto i = 0; i < v.size(); i++)
+            {
+                if (*(stdev_diff_it + i) > SPIKE_THRESHOLD) continue;
+                filtered_delay.push_back(*(v_it + i));
+            }
+            streams_delay[stream.first] = filtered_delay;
             std::cout << "NOHA "<<std::endl;
+        }
+        for (const auto& stream : streams_delay)
+        {
+            REQUIRE(stream.second.size() > 3);
         }
         // check if increment percentage is below a threshold [%]
         for (const auto& stream_ : streams_delay)
