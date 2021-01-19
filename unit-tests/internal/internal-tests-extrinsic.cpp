@@ -155,8 +155,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         std::map<std::string, std::vector<size_t>> streams_delay; // map to vector to collect all data
         //std::map<size_t, size_t> delay_threshold_at_stream_type;
         std::map<std::string, size_t> delay_thresholds;
-        std::map<std::string, std::vector<size_t>> frame_number;
-        
+        std::map<std::string, std::vector<unsigned long long>> frame_number;
+        std::map<std::string, bool> new_frame;
 
         // TODO : set correct values for thresholds (take threshold of fps=6)
         delay_thresholds["color"] = 6000;
@@ -186,10 +186,10 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             
             rs2::config tmp_cfg = cfg;
             rs2::pipeline pipe;
-            rs2::frameset data;
+            rs2::frameset frames;
             pipe.start(tmp_cfg);
            
-            struct new_frames
+            /*struct new_frames
             {
                 bool color = false;
                 bool depth = false;
@@ -198,75 +198,42 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 bool accel = false;
                 bool gyro = false;
             };
-            new_frames new_frames_arrival;
+            new_frames new_frames_arrival;*/
+
+            
             try
             {
                 
                 // TODO : use callback for this
                 for (auto i = 0; i < frames_per_iteration; i++)
+                //while(counter_per_stream == 20) // FW issue..
                 {
                     auto t1 = std::chrono::system_clock::now().time_since_epoch();
                     auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
 
-                    data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
-
-                    // check if frame is new according to its frame number
-                    // if condition is met, it means we got a new frame
-                    if (!new_frames_arrival.color && (std::find(frame_number["color"].begin(), frame_number["color"].end(), data.get_color_frame().get_frame_number()) == frame_number["color"].end()))
+                    frames = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+                    for (auto&& f : frames)
                     {
-                        frame_number["color"].push_back(data.get_color_frame().get_frame_number());
-                        streams_delay["color"].push_back(data.get_color_frame().get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
-                        new_frames_arrival.color = true;
-                    }
-                    if (!new_frames_arrival.depth && (std::find(frame_number["depth"].begin(), frame_number["depth"].end(), data.get_depth_frame().get_frame_number()) == frame_number["depth"].end()))
-                    {
-                        frame_number["depth"].push_back(data.get_depth_frame().get_frame_number());
-                        streams_delay["depth"].push_back(data.get_depth_frame().get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
-                        new_frames_arrival.depth = true;
-                    }
-                    if (!new_frames_arrival.ir0 && (std::find(frame_number["ir0"].begin(), frame_number["ir0"].end(), data.get_infrared_frame(0).get_frame_number()) == frame_number["ir0"].end()))
-                    {
-                        frame_number["ir0"].push_back(data.get_infrared_frame(0).get_frame_number());
-                        streams_delay["ir0"].push_back(data.get_infrared_frame(0).get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
-                        new_frames_arrival.ir0 = true;
-                    }
-                    if (!new_frames_arrival.ir1 && (std::find(frame_number["ir1"].begin(), frame_number["ir1"].end(), data.get_infrared_frame(0).get_frame_number()) == frame_number["ir1"].end()))
-                    {
-                        frame_number["ir1"].push_back(data.get_infrared_frame(0).get_frame_number());
-                        streams_delay["ir1"].push_back(data.get_infrared_frame(0).get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
-                        new_frames_arrival.ir1 = true;
-                    }
-                    
-                    auto accel = data.first_or_default(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
-                    auto gyro = data.first_or_default(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
-                    if (!new_frames_arrival.accel && (std::find(frame_number["accel"].begin(), frame_number["accel"].end(), accel.get_frame_number()) == frame_number["accel"].end()))
-                    {
-                        frame_number["accel"].push_back(accel.get_frame_number());
-                        streams_delay["accel"].push_back(accel.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
-                        new_frames_arrival.accel = true;
-                    }
-                    if (!new_frames_arrival.gyro && (std::find(frame_number["gyro"].begin(), frame_number["gyro"].end(), gyro.get_frame_number()) == frame_number["gyro"].end()))
-                    {
-                        frame_number["gyro"].push_back(accel.get_frame_number());
-                        streams_delay["gyro"].push_back(accel.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - milli);
-                        new_frames_arrival.gyro = true;
+                        auto stream_type = f.get_profile().stream_name();
+                        auto frame_num = f.get_frame_number();
+                        auto time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
+                        if (!new_frame[stream_type] && (std::find(frame_number[stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end()))
+                        {
+                            frame_number[stream_type].push_back(frame_num);
+                            streams_delay[stream_type].push_back(time_of_arrival  - milli);
+                            new_frame[stream_type] = true;
+                        }
                     }
 
-
-                    if (new_frames_arrival.color && new_frames_arrival.depth && new_frames_arrival.ir0 && new_frames_arrival.ir1) break;
-
-                    //TODO :for ACCEL and GYRO check correct fps in rs-enumerate-device tool
-                    
                 }
 
-                extrinsics_table_size.push_back(b._extrinsics.size());
-
                 pipe.stop();
+                extrinsics_table_size.push_back(b._extrinsics.size());
             }
             catch (...)
             {
                 std::cout << "Iteration failed  " << std::endl;
-                exit(EXIT_FAILURE);
+                //exit(EXIT_FAILURE);
             }
         }
 
@@ -281,7 +248,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         CAPTURE(extrinsics_table_size);
         CAPTURE(streams_delay);
         // 1. extrinsics table preserve its size over iterations
-        REQUIRE(std::adjacent_find(extrinsics_table_size.begin(), extrinsics_table_size.end(), std::not_equal_to<>()) == extrinsics_table_size.end());
+        CHECK(std::adjacent_find(extrinsics_table_size.begin(), extrinsics_table_size.end(), std::not_equal_to<>()) == extrinsics_table_size.end());
         // 2.  no delay increment over iterations - TODO
         for (auto i = 0; i < cfg_size; i++)
         {
@@ -315,7 +282,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             auto dx = std::abs(last_x_avg - first_x_avg);
             float dy_dx = dy / dx;
             CAPTURE(dy_dx);
-            REQUIRE(dy_dx < DELAY_INCREMENT_THRESHOLD); // TODO : set this threshold to fail the test when there is memory leak
+            /// change to %
+            CHECK(dy_dx < DELAY_INCREMENT_THRESHOLD); // TODO : set this threshold to fail the test when there is memory leak
         }
 
         // 3. "most" iterations have time to first frame delay below a defined threshold
@@ -325,7 +293,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             CAPTURE(streams[i]);
             auto stream = streams[i];
             for (auto it = streams_delay[stream].begin(); it != streams_delay[stream].end(); ++it) {
-                REQUIRE(*it < delay_thresholds[stream]);
+                CHECK(*it < delay_thresholds[stream]);
             }
         }
 
