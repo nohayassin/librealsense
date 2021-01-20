@@ -198,7 +198,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 {
                     auto t1 = std::chrono::system_clock::now().time_since_epoch();
                     auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
-
                     frames = pipe.wait_for_frames(); // Wait for next set of frames from the camera
                     for (auto&& f : frames)
                     {
@@ -241,11 +240,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         }
 
         std::cout << "Analyzing info ..  " << std::endl;
-        // before analyzing make sure we have enough data
-        for (const auto& stream : streams_delay)
-        {
-            REQUIRE(stream.second.size() > 3);
-        }
 
         // the test will succeed only if all 3 conditions are met:
         // 1. extrinsics table size is perserved over iterations for each stream 
@@ -259,9 +253,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // filter spikes : calc stdev for each half and filter out samples that are not close 
         for (auto& stream : streams_delay)
         {
+            // make sure we have enough data for each stream
+            REQUIRE(stream.second.size() > 3);
             size_t first_size = stream.second.size() / 2;
             std::vector<double> v1(stream.second.begin(), stream.second.begin() + first_size);
-            std::vector<double> v2(stream.second.begin() + first_size, stream.second.begin() + stream.second.size());
+            std::vector<double> v2(stream.second.begin() + first_size, stream.second.end());
             std::vector<std::pair<std::vector<double>, std::vector<double>>> all;
             std::vector<double> filtered_delay1;
             std::vector<double> filtered_delay2;
@@ -274,16 +270,13 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             double max_sample[2];
             for (auto& vec : all)
             {
-
                 auto v = vec.first;
                 double sum = std::accumulate(v.begin(), v.end(), 0.0);
                 double mean = sum / v.size();
-
                 std::vector<double> diff(v.size());
                 std::transform(v.begin(), v.end(), diff.begin(), std::bind2nd(std::minus<double>(), mean));
                 double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
                 double stdev = std::sqrt(sq_sum / v.size());
-
                 std::vector<double> stdev_diff(v.size());
                 auto v_size = v.size();
                 std::transform(v.begin(), v.end(), stdev_diff.begin(), [stdev, v_size, mean](double d) {
@@ -296,7 +289,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
                 auto stdev_diff_it = stdev_diff.begin();
                 auto v_it = v.begin();
-
                 for (auto i = 0; i < v.size(); i++)
                 {
                     if (*(stdev_diff_it + i) > SPIKE_THRESHOLD) continue;
@@ -322,7 +314,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             CHECK(dy_dx < DELAY_INCREMENT_THRESHOLD);
 
         }
-
         // 3. "most" iterations have time to first frame delay below a defined threshold
         for (const auto& stream_ : streams_delay)
         {
