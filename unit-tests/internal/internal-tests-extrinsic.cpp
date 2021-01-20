@@ -271,17 +271,24 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         for (const auto& stream : streams_delay)
         {
             size_t first_size = stream.second.size() / 2;
-            size_t last_size = stream.second.size() - first_size;
 
-            std::vector<double> filtered_delay;
+            
             std::vector<double> v1(stream.second.begin(), stream.second.begin()+ first_size);
             std::vector<double> v2(stream.second.begin() + first_size , stream.second.begin() + stream.second.size());
-            std::vector<std::vector<double>> all;
-            all.push_back(v1);
-            all.push_back(v2);
-
-            for (auto v : all)
+            //std::vector<std::vector<double>> all;
+            std::vector<std::pair<std::vector<double>, std::vector<double>>> all;
+            std::vector<double> filtered_delay1;
+            std::vector<double> filtered_delay2;
+            all.push_back({ v1, filtered_delay1 });
+            all.push_back({ v2, filtered_delay2 });
+            //std::vector<std::pair<double, double>> filtered_vec_sum;
+            std::pair<double, double> filtered_vec_sum_arr[2];
+            // filter spikes from both parts
+            int i = 0;
+            for (auto &vec : all)
             {
+                i += 1;
+                auto v = vec.first;
                 double sum = std::accumulate(v.begin(), v.end(), 0.0);
                 double mean = sum / v.size();
 
@@ -304,12 +311,24 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 for (auto i = 0; i < v.size(); i++)
                 {
                     if (*(stdev_diff_it + i) > SPIKE_THRESHOLD) continue;
-                    filtered_delay.push_back(*(v_it + i));
+                    vec.second.push_back(*(v_it + i));
                 }
+                auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
+                filtered_vec_sum_arr[i] = { sum_of_elems , vec.second.size()};
+                // make sure after filtering there still data in both parts 
+                CAPTURE(stream.first, vec.second.size());
+                REQUIRE(vec.second.size() > 0);
             }
-            // check if increment percentage between the 2 vectors is below a threshold [%]
-            // TODO
-            //streams_delay[stream.first] = filtered_delay;
+
+            // check if increment between the 2 vectors is below a threshold 
+            //double y1, y2, x1, x2;
+            auto y1 = filtered_vec_sum_arr[0].first;
+            auto y2 = filtered_vec_sum_arr[1].first;
+            auto x1 = filtered_vec_sum_arr[0].second;
+            auto x2 = filtered_vec_sum_arr[1].second;
+            double dy_dx = abs((y2-y1)/(x2-x1));
+            std::cout << "NOHA" << std::endl;
+
         }
         for (const auto& stream : streams_delay)
         {
