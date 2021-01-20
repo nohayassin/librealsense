@@ -19,9 +19,8 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
-
-#define ITERATIONS_PER_CONFIG 15
-#define DELAY_INCREMENT_THRESHOLD 20 //[%]
+#define ITERATIONS_PER_CONFIG 50
+#define DELAY_INCREMENT_THRESHOLD 5 //[%]
 #define SPIKE_THRESHOLD 10 //[%]
 
 // Require that vector is exactly the zero vector
@@ -29,6 +28,7 @@ using namespace librealsense::platform;
 {
     for (int i = 1; i < 3; ++i) REQUIRE(vector[i] == 0.0f);
 }
+
 // Require that matrix is exactly the identity matrix
 inline void require_identity_matrix(const float(&matrix)[9])
 {
@@ -303,7 +303,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
                 filtered_vec_sum_arr[i] = { sum_of_elems , vec.second.size() };
                 i += 1;
-                
+
             }
             stream.second = v1_2;
             // check if increment between the 2 vectors is below a threshold  
