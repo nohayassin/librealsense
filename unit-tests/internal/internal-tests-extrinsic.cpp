@@ -19,9 +19,9 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
-#define ITERATIONS_PER_CONFIG 15
-#define DELAY_INCREMENT_THRESHOLD 50 //[%]
-#define SPIKE_THRESHOLD 10 //[%]
+#define ITERATIONS_PER_CONFIG 30
+#define DELAY_INCREMENT_THRESHOLD 20 //[%]
+#define SPIKE_THRESHOLD 8 //[%]
 
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
@@ -270,6 +270,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             double max_sample[2];
             for (auto& vec : all)
             {
+                CAPTURE(stream.first, vec.first.size());
+                REQUIRE(vec.first.size() > 2);
                 auto v = vec.first;
                 double sum = std::accumulate(v.begin(), v.end(), 0.0);
                 double mean = sum / v.size();
@@ -286,7 +288,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                     return  val > 0 ? val : -val;
                     }
                 );
-
                 auto stdev_diff_it = stdev_diff.begin();
                 auto v_it = v.begin();
                 for (auto i = 0; i < v.size(); i++)
@@ -294,14 +295,15 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                     if (*(stdev_diff_it + i) > SPIKE_THRESHOLD) continue;
                     vec.second.push_back(*(v_it + i));
                 }
+                // make sure after filtering there still data in both parts 
+                CAPTURE(stream.first, vec.second.size());
+                REQUIRE(vec.second.size() > 0);
                 v1_2.insert(std::end(v1_2), std::begin(vec.second), std::end(vec.second));
                 max_sample[i] = *std::max_element(std::begin(vec.second), std::end(vec.second));
                 auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
                 filtered_vec_sum_arr[i] = { sum_of_elems , vec.second.size() };
                 i += 1;
-                // make sure after filtering there still data in both parts 
-                CAPTURE(stream.first, vec.second.size());
-                REQUIRE(vec.second.size() > 0);
+
             }
             stream.second = v1_2;
             // check if increment between the 2 vectors is below a threshold  
