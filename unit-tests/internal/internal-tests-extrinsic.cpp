@@ -13,12 +13,16 @@
 #include "./../src/environment.h"
 
 #include <unit-tests-common.h>
+#include <numeric>
+#include <stdlib.h> 
 
 using namespace librealsense;
 using namespace librealsense::platform;
 
 #define TIME_INCREMENT_THRESHOLD 5
-#define ITERATIONS_PER_CONFIG 3
+#define ITERATIONS_PER_CONFIG 15
+#define DELAY_INCREMENT_THRESHOLD 1.0f
+#define SPIKE_THRESHOLD 5
 
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
@@ -138,105 +142,226 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
         auto video = mode.as<rs2::video_stream_profile>();
         auto res = configure_all_supported_streams(dev, video.width(), video.height(), mode.fps());
-        // 1. check if extrinsics table size is perserved over iterations of same stream type and fps
-        // 2. check if time to first frame exceeds a define threshold :
-        //      - RGB : 1200 msec
-        //      - DEPTH : (should be same as L500)
-        //      - IR : ?
-        // 3. check if there is increment of time to first frame: 
-        //      - throw exception even though the threshold from #2 is not reached
-        //      - run 20 iterations to get to this conclusion
-        //      - in each iteration check delay against the previous 2 iterations : 
-        //      - if current itration delay > previous 2 iterations delay, increase count by 1
 
-        struct time_increment
-        {
-            size_t t0 = 0;
-            size_t t1 = 0;
-            size_t count = 0;
-        };
+        // collect a log that contains info about 20 iterations for each stream
+        // the info should include:
+        // 1. extrinsics table size
+        // 2. delay to first frame
+        // 3. delay threshold for each stream (set fps=6 delay as worst case)
+        // the test will succeed only if all 3 conditions are met:
+        // 1. extrinsics table size is perserved over iterations for each stream 
+        // 2. no delay increment over iterations
+        // 3. "most" iterations have time to first frame delay below a defined threshold
 
-        std::map<std::string, size_t> extrinsic_graph_at_cfg;
-        std::map<std::string, time_increment> time_increment_at_cfg;
-        std::map<size_t, size_t> delay_threshold_at_stream_type;
+        std::vector<size_t> extrinsics_table_size;
+        std::map<std::string, std::vector<double>> streams_delay; // map to vector to collect all data
+        std::map<std::string, std::vector<std::map<unsigned long long, size_t >>> unique_streams_delay;
+        std::map<std::string, double> delay_thresholds;
+        std::map<std::string, std::vector<unsigned long long>> frame_number;
+        std::map<std::string, size_t> new_frame;
 
-        // TODO : set correct values for thresholds
-        delay_threshold_at_stream_type[RS2_STREAM_DEPTH] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_COLOR] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_INFRARED] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_FISHEYE] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_GYRO] = 6000;
-        delay_threshold_at_stream_type[RS2_STREAM_ACCEL] = 6000;
-
+        // TODO : set correct values for thresholds (take threshold of fps=6)
+        delay_thresholds["Accel"] = 1000; // ms
+        delay_thresholds["Color"] = 1000; // ms
+        delay_thresholds["Depth"] = 1000; // ms
+        delay_thresholds["Gyro"] = 1000; // ms
+        delay_thresholds["Infrared 1"] = 1000; // ms
+        delay_thresholds["Infrared 2"] = 1000; // ms
 
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
-        auto& b = environment::get_instance().get_extrinsics_graph();
 
+        /*rs2::config cfg;
+        size_t cfg_size = 0;
         for (auto profile : res.second)
         {
-            int type = profile.stream;
-            int format = profile.format;
-            std::cout << "==================================================================================" << std::endl;
-            std::cout << "stream type :" << type << ", index : " << profile.index << ", width : " << profile.width << ", height : " << profile.height << ", format : " << format << ", fps : " << profile.fps << std::endl;
-            std::string cfg_key = std::to_string(format) + "," + std::to_string(profile.fps);
-            std::cout << "cfg key :" << cfg_key << std::endl;
-            time_increment_at_cfg[cfg_key].count = 0;
-            time_increment_at_cfg[cfg_key].t0 = 0;
-            time_increment_at_cfg[cfg_key].t1 = 0;
+            cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
+            cfg_size += 1;
+        }*/
 
-            for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
+        auto& b = environment::get_instance().get_extrinsics_graph();
+        for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
+        {
+
+            //rs2::config tmp_cfg = cfg;
+            rs2::config cfg;
+            size_t cfg_size = 0;
+            for (auto profile : res.second)
             {
-                rs2::pipeline pipe;
-                rs2::config cfg;
-                cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps);
-                pipe.start(cfg);
-                auto frames_per_iteration = profile.fps * 5;
+                cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
+                cfg_size += 1;
+            }
 
-                try
+            rs2::pipeline pipe;
+            rs2::frameset frames;
+            pipe.start(cfg);
+
+            try
+            {
+                for (auto it = new_frame.begin(); it != new_frame.end(); it++)
                 {
-                    auto t1 = std::chrono::system_clock::now();
-                    for (auto i = 0; i < frames_per_iteration; i++)
-                    {
-                        rs2::frameset data = pipe.wait_for_frames(); // Wait for next set of frames from the camera
-                    }
-
-                    auto t2 = std::chrono::system_clock::now();
-                    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count();
-
-
-                    // 1. check extrinsics table size
-                    if (!extrinsic_graph_at_cfg.count(cfg_key))
-                    {
-                        extrinsic_graph_at_cfg[cfg_key] = b._extrinsics.size();
-                        std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff;// << std::endl;
-                    }
-                    else {
-                        std::cout << " Extrinsic Graph size is " << extrinsic_graph_at_cfg[cfg_key] << ", Time to first frame is " << diff;// << std::endl;
-                        REQUIRE(b._extrinsics.size() == extrinsic_graph_at_cfg[cfg_key]);
-                    }
-
-                    // 2. threshold 
-                    REQUIRE(diff < delay_threshold_at_stream_type[profile.stream]);
-
-                    // 3. delay increment
-                    if (diff > time_increment_at_cfg[cfg_key].t0 && diff > time_increment_at_cfg[cfg_key].t1)
-                    {
-                        time_increment_at_cfg[cfg_key].count += 1;
-                        REQUIRE(time_increment_at_cfg[cfg_key].count < TIME_INCREMENT_THRESHOLD);
-                    }
-                    std::cout << ", increment count is: " << time_increment_at_cfg[cfg_key].count << std::endl;
-                    // cache only previous 2 iterations
-                    time_increment_at_cfg[cfg_key].t0 = time_increment_at_cfg[cfg_key].t1;
-                    time_increment_at_cfg[cfg_key].t1 = diff;
-
-                    pipe.stop();
+                    it->second = 0;
                 }
-                catch (...)
+                // to prevent FW issue, at least 20 frames per stream should arrive
+                bool condition = false;
+                std::map<std::string, size_t> frames_count_per_stream;
+                while (!condition) // the condition is set to true when at least 20 frames are received per stream
                 {
-                    std::cout << "Iteration failed  " << std::endl;
-                    exit(EXIT_FAILURE);
+                    auto t1 = std::chrono::system_clock::now().time_since_epoch();
+                    auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
+
+                    frames = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+                    for (auto&& f : frames)
+                    {
+                        auto stream_type = f.get_profile().stream_name();
+                        auto frame_num = f.get_frame_number();
+                        auto time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
+
+                        if (std::find(frame_number[stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end())
+                        {
+                            if (!new_frame[stream_type])
+                            {
+                                frame_number[stream_type].push_back(frame_num);
+                                streams_delay[stream_type].push_back(time_of_arrival - milli);
+                                new_frame[stream_type] = true;
+                            }
+                            new_frame[stream_type] += 1;
+                        }
+                    }
+                    if (new_frame.size() == cfg_size)
+                    {
+                        condition = true;
+                        for (auto it = new_frame.begin(); it != new_frame.end(); it++)
+                        {
+                            if (it->second < 20)
+                            {
+                                condition = false;
+                                break;
+                            }
+                        }
+                        // all streams received more than 20 frames
+                    }
                 }
+                pipe.stop();
+                extrinsics_table_size.push_back(b._extrinsics.size());
+            }
+            catch (...)
+            {
+                std::cout << "Iteration failed  " << std::endl;
             }
         }
+
+        std::cout << "Analyzing info ..  " << std::endl;
+        // before analyzing make sure we have enough data
+        for (const auto& stream : streams_delay)
+        {
+            REQUIRE(stream.second.size() > 3);
+        }
+
+        // the test will succeed only if all 3 conditions are met:
+        // 1. extrinsics table size is perserved over iterations for each stream 
+        // 2. no delay increment over iterations
+        // 3. "most" iterations have time to first frame delay below a defined threshold
+
+        //static const std::string streams[] = { "color", "depth", "ir0", "ir1", "accel", "gyro" };
+        CAPTURE(extrinsics_table_size);
+        // 1. extrinsics table preserve its size over iterations
+        CHECK(std::adjacent_find(extrinsics_table_size.begin(), extrinsics_table_size.end(), std::not_equal_to<>()) == extrinsics_table_size.end());
+        // 2.  no delay increment over iterations 
+        // filter spikes : calc stdev for each half and filter out samples that are not close 
+        for (const auto& stream : streams_delay)
+        {
+            size_t first_size = stream.second.size() / 2;
+            size_t last_size = stream.second.size() - first_size;
+
+            std::vector<double> filtered_delay;
+            std::vector<double> v1(stream.second.begin(), stream.second.begin()+ first_size);
+            std::vector<double> v2(stream.second.begin() + first_size , stream.second.begin() + stream.second.size());
+            std::vector<std::vector<double>> all;
+            all.push_back(v1);
+            all.push_back(v2);
+
+            for (auto v : all)
+            {
+                double sum = std::accumulate(v.begin(), v.end(), 0.0);
+                double mean = sum / v.size();
+
+                std::vector<double> diff(v.size());
+                std::transform(v.begin(), v.end(), diff.begin(), std::bind2nd(std::minus<double>(), mean));
+                double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+                double stdev = std::sqrt(sq_sum / v.size());
+
+                std::vector<double> stdev_diff(v.size());
+                auto v_size = v.size();
+                std::transform(v.begin(), v.end(), stdev_diff.begin(), [stdev, v_size](double d) {
+                    d = d < 0 ? -d : d;
+                    auto val = (d - stdev) / v_size;
+                    return val > 0 ? val : -val;
+                    }
+                );
+                auto stdev_diff_it = stdev_diff.begin();
+                auto v_it = v.begin();
+
+                for (auto i = 0; i < v.size(); i++)
+                {
+                    if (*(stdev_diff_it + i) > SPIKE_THRESHOLD) continue;
+                    filtered_delay.push_back(*(v_it + i));
+                }
+            }
+            // check if increment percentage between the 2 vectors is below a threshold [%]
+            // TODO
+            //streams_delay[stream.first] = filtered_delay;
+        }
+        for (const auto& stream : streams_delay)
+        {
+            CAPTURE(stream.first, stream.second);
+            REQUIRE(stream.second.size() > 3);
+        }
+        // check if increment percentage is below a threshold [%]
+        for (const auto& stream_ : streams_delay)
+        {
+            CAPTURE(stream_.first, stream_.second);
+            auto stream = stream_.first;
+            auto it = streams_delay[stream].begin();
+            size_t sum_first_delay = 0;
+            size_t sum_last_delay = 0;
+            size_t sum_first_x = 0;
+            size_t sum_last_x = 0;
+            int j = 0;
+            size_t first_size = streams_delay[stream].size() / 2;
+            size_t last_size = streams_delay[stream].size() - first_size;
+            for (; j < streams_delay[stream].size() / 2; j++) {
+                sum_first_delay += *(it + j) < delay_thresholds[stream];
+                sum_first_x += j;
+            }
+            for (; j < streams_delay[stream].size(); j++) {
+                sum_last_delay += *(it + j) < delay_thresholds[stream];
+                sum_last_x += j;
+            }
+            // at this point, first_size and last_size are > 0
+            float first_delay_avg = sum_first_delay / first_size;
+            float last_delay_avg = sum_last_delay / last_size;
+            float first_x_avg = sum_first_x / first_size;
+            float last_x_avg = sum_last_x / last_size;
+
+            // calc dy/dx
+            auto dy = std::abs(last_delay_avg - first_delay_avg);
+            auto dx = std::abs(last_x_avg - first_x_avg);
+            float dy_dx = dy / dx;
+            CAPTURE(dy_dx);
+            /// TODO change to %
+            CHECK(dy_dx < DELAY_INCREMENT_THRESHOLD); // TODO : set this threshold to fail the test when there is memory leak
+        }
+
+        // 3. "most" iterations have time to first frame delay below a defined threshold
+
+        for (const auto& stream_ : streams_delay)
+        {
+            auto stream = stream_.first;
+            CAPTURE(stream);
+            for (auto it = streams_delay[stream].begin(); it != streams_delay[stream].end(); ++it) {
+                CHECK(*it < delay_thresholds[stream]);
+            }
+        }
+
     }
 }
