@@ -19,9 +19,9 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
-#define TIME_INCREMENT_THRESHOLD 5
+
 #define ITERATIONS_PER_CONFIG 15
-#define DELAY_INCREMENT_THRESHOLD 50
+#define DELAY_INCREMENT_THRESHOLD 50 //[%]
 #define SPIKE_THRESHOLD 10 //[%]
 
 // Require that vector is exactly the zero vector
@@ -170,19 +170,9 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
 
-        /*rs2::config cfg;
-        size_t cfg_size = 0;
-        for (auto profile : res.second)
-        {
-            cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
-            cfg_size += 1;
-        }*/
-
         auto& b = environment::get_instance().get_extrinsics_graph();
         for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
         {
-
-            //rs2::config tmp_cfg = cfg;
             rs2::config cfg;
             size_t cfg_size = 0;
             for (auto profile : res.second)
@@ -262,7 +252,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 2. no delay increment over iterations
         // 3. "most" iterations have time to first frame delay below a defined threshold
 
-        //static const std::string streams[] = { "color", "depth", "ir0", "ir1", "accel", "gyro" };
         CAPTURE(extrinsics_table_size);
         // 1. extrinsics table preserve its size over iterations
         CHECK(std::adjacent_find(extrinsics_table_size.begin(), extrinsics_table_size.end(), std::not_equal_to<>()) == extrinsics_table_size.end());
@@ -271,20 +260,17 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         for (auto& stream : streams_delay)
         {
             size_t first_size = stream.second.size() / 2;
-
-            
             std::vector<double> v1(stream.second.begin(), stream.second.begin()+ first_size);
             std::vector<double> v2(stream.second.begin() + first_size , stream.second.begin() + stream.second.size());
-            //std::vector<std::vector<double>> all;
             std::vector<std::pair<std::vector<double>, std::vector<double>>> all;
             std::vector<double> filtered_delay1;
             std::vector<double> filtered_delay2;
             all.push_back({ v1, filtered_delay1 });
             all.push_back({ v2, filtered_delay2 });
-            //std::vector<std::pair<double, double>> filtered_vec_sum;
             std::pair<double, double> filtered_vec_sum_arr[2];
             // filter spikes from both parts
             int i = 0;
+            double max_sample[2];
             for (auto &vec : all)
             {
                 
@@ -316,6 +302,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                     vec.second.push_back(*(v_it + i));
                 }
                 stream.second = vec.second;
+                max_sample[i] = *std::max_element(std::begin(vec.second), std::end(vec.second));
                 auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
                 filtered_vec_sum_arr[i] = { sum_of_elems , vec.second.size()};
                 i += 1;
@@ -323,21 +310,18 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 CAPTURE(stream.first, vec.second.size());
                 REQUIRE(vec.second.size() > 0);
             }
-            //stream.second.
-            // check if increment between the 2 vectors is below a threshold 
+            // check if increment between the 2 vectors is below a threshold  
             auto y1 = filtered_vec_sum_arr[0].first;
             auto y2 = filtered_vec_sum_arr[1].first;
-            auto x1 = filtered_vec_sum_arr[0].second;
-            auto x2 = filtered_vec_sum_arr[1].second;
-            double dy_dx = abs((y2-y1)/(x2-x1));
-            std::cout << "NOHA" << std::endl;
+            auto dy = abs(y1 - y2) / std::max(max_sample[0], max_sample[1]);
+            double dy_dx = 100 * dy/ stream.second.size();
+
             CAPTURE(stream.first, dy_dx);
-            CHECK(dy_dx > DELAY_INCREMENT_THRESHOLD);
+            CHECK(dy_dx < DELAY_INCREMENT_THRESHOLD);
 
         }
 
         // 3. "most" iterations have time to first frame delay below a defined threshold
-
         for (const auto& stream_ : streams_delay)
         {
             auto stream = stream_.first;
