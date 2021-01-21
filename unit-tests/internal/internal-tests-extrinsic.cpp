@@ -329,10 +329,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         {
             delay_thresholds["Accel"] = 2000; // ms
             delay_thresholds["Color"] = 1200; // ms
-            delay_thresholds["Depth"] = 1000; // ms
             delay_thresholds["Gyro"] = 2000; // ms
-            delay_thresholds["Infrared 1"] = 1000; // ms
-            delay_thresholds["Infrared 2"] = 1000; // ms
         }
 
         for (const auto& stream_ : streams_delay)
