@@ -21,6 +21,7 @@ using namespace librealsense::platform;
 
 #define ITERATIONS_PER_CONFIG 100
 #define DELAY_INCREMENT_THRESHOLD 5 //[%]
+#define DELAY_INCREMENT_THRESHOLD_IMU 40 //[%]
 #define SPIKE_THRESHOLD 5 //[%]
 
 bool get_mode(rs2::device& dev, rs2::stream_profile* profile, int mode_index = 0)
@@ -171,7 +172,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         REQUIRE(list.size());
         auto dev = list.front();
         //auto sens = dev.query_sensors();
-
+        std::string device_type = "L500";
+        if (dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE) && std::string(dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE)) == "D400") device_type = "D400";
         rs2::stream_profile mode;
         auto mode_index = 0;
         bool usb3_device = is_usb3(dev);
@@ -210,7 +212,9 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             size_t cfg_size = 0;
             for (auto profile : res.second)
             {
-                cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
+                auto fps = profile.fps;
+                if (device_type == "D400" && profile.stream == RS2_STREAM_ACCEL) fps = 250;
+                cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, fps); // all streams in cfg
                 cfg_size += 1;
             }
             rs2::pipeline pipe;
@@ -260,7 +264,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                                 break;
                             }
                         }
-                        // all streams received more than 20 frames
+                        // all streams received more than 10 frames
                     }
                 }
                 pipe.stop();
@@ -303,19 +307,34 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             if (y2 < y1) continue;
             double dy_dx = y2 / y1;
             dy_dx = 100 * (dy_dx - 1);
-            std::cout << stream.first << ":" << dy_dx << std::endl;
-            CAPTURE(stream.first, dy_dx);
-            CHECK(dy_dx < DELAY_INCREMENT_THRESHOLD);
+            std::cout << stream.first << " : " << dy_dx << std::endl;
+            auto threshold = DELAY_INCREMENT_THRESHOLD;
+            if (stream.first == "Accel" || stream.first == "Gyro") threshold = DELAY_INCREMENT_THRESHOLD_IMU;
+            CAPTURE(stream.first, dy_dx, threshold);
+            CHECK(dy_dx < threshold);
 
         }
         // 3. "most" iterations have time to first frame delay below a defined threshold
         std::map<std::string, double> delay_thresholds;
+        // D400
         delay_thresholds["Accel"] = 1200; // ms
         delay_thresholds["Color"] = 1000; // ms
         delay_thresholds["Depth"] = 1000; // ms
         delay_thresholds["Gyro"] = 1200; // ms
         delay_thresholds["Infrared 1"] = 1000; // ms
         delay_thresholds["Infrared 2"] = 1000; // ms
+
+        // L500
+        if (device_type == "L500")
+        {
+            delay_thresholds["Accel"] = 2000; // ms
+            delay_thresholds["Color"] = 1200; // ms
+            delay_thresholds["Depth"] = 1000; // ms
+            delay_thresholds["Gyro"] = 2000; // ms
+            delay_thresholds["Infrared 1"] = 1000; // ms
+            delay_thresholds["Infrared 2"] = 1000; // ms
+        }
+
         for (const auto& stream_ : streams_delay)
         {
             auto v = stream_.second;
