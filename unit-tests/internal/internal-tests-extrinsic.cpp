@@ -217,12 +217,12 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         std::map<std::string, size_t> new_frame;
 
         // TODO : set correct values for thresholds (take threshold of fps=6)
-        delay_thresholds["Accel"] = 20; // ms
-        delay_thresholds["Color"] = 155; // ms
-        delay_thresholds["Depth"] = 155; // ms
-        delay_thresholds["Gyro"] = 20; // ms
-        delay_thresholds["Infrared 1"] = 150; // ms
-        delay_thresholds["Infrared 2"] = 150; // ms
+        delay_thresholds["Accel"] = 1000; // ms
+        delay_thresholds["Color"] = 1000; // ms
+        delay_thresholds["Depth"] = 1000; // ms
+        delay_thresholds["Gyro"] = 1000; // ms
+        delay_thresholds["Infrared 1"] = 1000; // ms
+        delay_thresholds["Infrared 2"] = 1000; // ms
 
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
 
@@ -313,12 +313,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         for (auto& stream : streams_delay)
         {
             // make sure we have enough data for each stream
-            REQUIRE(stream.second.size() > 3);
+            REQUIRE(stream.second.size() > 10);
             
             double filtered_vec_avg_arr[2];
             data_filter(filtered_vec_avg_arr, stream.second, stream.first);
 
-            
             // check if increment between the 2 vectors is below a threshold  
             auto y1 = filtered_vec_avg_arr[0];// / std::max(max_sample[0], max_sample[1]);
             auto y2 = filtered_vec_avg_arr[1];// / std::max(max_sample[0], max_sample[1]);
