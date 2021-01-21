@@ -21,7 +21,7 @@ using namespace librealsense::platform;
 
 #define ITERATIONS_PER_CONFIG 50
 #define DELAY_INCREMENT_THRESHOLD 5 //[%]
-#define SPIKE_THRESHOLD 4 //[%]
+#define SPIKE_THRESHOLD 5 //[%]
 
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
@@ -54,6 +54,62 @@ bool get_mode(rs2::device& dev, rs2::stream_profile* profile, int mode_index = 0
     return false;
 }
 
+void data_filter(double* filtered_vec_avg_arr,  std::vector<double>& stream_vec, std::string const stream_type)
+{
+    size_t first_size = stream_vec.size() / 2;
+    std::vector<double> v1(stream_vec.begin(), stream_vec.begin() + first_size);
+    std::vector<double> v2(stream_vec.begin() + first_size, stream_vec.end());
+    std::vector<std::pair<std::vector<double>, std::vector<double>>> all;
+    std::vector<double> filtered_delay1;
+    std::vector<double> filtered_delay2;
+    all.push_back({ v1, filtered_delay1 });
+    all.push_back({ v2, filtered_delay2 });
+
+    std::vector<double> v1_2;
+    // filter spikes from both parts
+    int i = 0;
+    double max_sample[2];
+
+    for (auto& vec : all)
+    {
+        CAPTURE(stream_type, vec.first.size());
+        REQUIRE(vec.first.size() > 2);
+
+        auto v = vec.first;
+        double sum = std::accumulate(v.begin(), v.end(), 0.0);
+        double mean = sum / v.size();
+        std::vector<double> diff(v.size());
+        std::transform(v.begin(), v.end(), diff.begin(), std::bind2nd(std::minus<double>(), mean));
+        double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
+        double stdev = std::sqrt(sq_sum / v.size());
+        std::vector<double> stdev_diff(v.size());
+        auto v_size = v.size();
+        std::transform(v.begin(), v.end(), stdev_diff.begin(), [stdev, v_size, mean](double d) {
+            d = d < 0 ? -d : d;
+            auto val = (d - mean) / v_size;
+            val = val * 100 / stdev;
+            return  val > 0 ? val : -val;
+            }
+        );
+        auto stdev_diff_it = stdev_diff.begin();
+        auto v_it = v.begin();
+        for (auto i = 0; i < v.size(); i++)
+        {
+            if (*(stdev_diff_it + i) > SPIKE_THRESHOLD) continue;
+            vec.second.push_back(*(v_it + i));
+        }
+        // make sure after filtering there still data in both parts 
+        CAPTURE(stream_type, vec.second.size());
+        REQUIRE(vec.second.size() > 0);
+        v1_2.insert(std::end(v1_2), std::begin(vec.second), std::end(vec.second));
+        max_sample[i] = *std::max_element(std::begin(vec.second), std::end(vec.second));
+        auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
+        filtered_vec_avg_arr[i] = sum_of_elems / vec.second.size();// / (max_sample * vec.second.size());// { sum_of_elems, vec.second.size() };
+        i += 1;
+
+    }
+    stream_vec = v1_2;
+}
 TEST_CASE("Extrinsic graph management", "[live][multicam]")
 {
     // Require at least one device to be plugged in
@@ -161,12 +217,12 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         std::map<std::string, size_t> new_frame;
 
         // TODO : set correct values for thresholds (take threshold of fps=6)
-        delay_thresholds["Accel"] = 1000; // ms
-        delay_thresholds["Color"] = 1000; // ms
-        delay_thresholds["Depth"] = 1000; // ms
-        delay_thresholds["Gyro"] = 1000; // ms
-        delay_thresholds["Infrared 1"] = 1000; // ms
-        delay_thresholds["Infrared 2"] = 1000; // ms
+        delay_thresholds["Accel"] = 20; // ms
+        delay_thresholds["Color"] = 155; // ms
+        delay_thresholds["Depth"] = 155; // ms
+        delay_thresholds["Gyro"] = 20; // ms
+        delay_thresholds["Infrared 1"] = 150; // ms
+        delay_thresholds["Infrared 2"] = 150; // ms
 
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
 
@@ -183,6 +239,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
             rs2::pipeline pipe;
             rs2::frameset frames;
+            auto t1 = std::chrono::system_clock::now().time_since_epoch();
             pipe.start(cfg);
 
             try
@@ -196,7 +253,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 std::map<std::string, size_t> frames_count_per_stream;
                 while (!condition) // the condition is set to true when at least 20 frames are received per stream
                 {
-                    auto t1 = std::chrono::system_clock::now().time_since_epoch();
+                    
                     auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
                     frames = pipe.wait_for_frames(); // Wait for next set of frames from the camera
                     for (auto&& f : frames)
@@ -257,65 +314,19 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         {
             // make sure we have enough data for each stream
             REQUIRE(stream.second.size() > 3);
-            size_t first_size = stream.second.size() / 2;
-            std::vector<double> v1(stream.second.begin(), stream.second.begin() + first_size);
-            std::vector<double> v2(stream.second.begin() + first_size, stream.second.end());
-            std::vector<std::pair<std::vector<double>, std::vector<double>>> all;
-            std::vector<double> filtered_delay1;
-            std::vector<double> filtered_delay2;
-            all.push_back({ v1, filtered_delay1 });
-            all.push_back({ v2, filtered_delay2 });
-            //std::pair<double, double> filtered_vec_sum_arr[2];
-            double filtered_vec_sum_arr[2];
-            std::vector<double> v1_2;
-            // filter spikes from both parts
-            int i = 0;
-            double max_sample[2];
-            for (auto& vec : all)
-            {
-                CAPTURE(stream.first, vec.first.size());
-                REQUIRE(vec.first.size() > 2);
-                auto v = vec.first;
-                double sum = std::accumulate(v.begin(), v.end(), 0.0);
-                double mean = sum / v.size();
-                std::vector<double> diff(v.size());
-                std::transform(v.begin(), v.end(), diff.begin(), std::bind2nd(std::minus<double>(), mean));
-                double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
-                double stdev = std::sqrt(sq_sum / v.size());
-                std::vector<double> stdev_diff(v.size());
-                auto v_size = v.size();
-                std::transform(v.begin(), v.end(), stdev_diff.begin(), [stdev, v_size, mean](double d) {
-                    d = d < 0 ? -d : d;
-                    auto val = (d - mean) / v_size;
-                    val = val * 100 / stdev;
-                    return  val > 0 ? val : -val;
-                    }
-                );
-                auto stdev_diff_it = stdev_diff.begin();
-                auto v_it = v.begin();
-                for (auto i = 0; i < v.size(); i++)
-                {
-                    if (*(stdev_diff_it + i) > SPIKE_THRESHOLD) continue;
-                    vec.second.push_back(*(v_it + i));
-                }
-                // make sure after filtering there still data in both parts 
-                CAPTURE(stream.first, vec.second.size());
-                REQUIRE(vec.second.size() > 0);
-                v1_2.insert(std::end(v1_2), std::begin(vec.second), std::end(vec.second));
-                max_sample[i] = *std::max_element(std::begin(vec.second), std::end(vec.second));
-                auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
-                filtered_vec_sum_arr[i] = sum_of_elems/ vec.second.size();// / (max_sample * vec.second.size());// { sum_of_elems, vec.second.size() };
-                i += 1;
+            
+            double filtered_vec_avg_arr[2];
+            data_filter(filtered_vec_avg_arr, stream.second, stream.first);
 
-            }
-            stream.second = v1_2;
+            
             // check if increment between the 2 vectors is below a threshold  
-            auto y1 = filtered_vec_sum_arr[0];// / std::max(max_sample[0], max_sample[1]);
-            auto y2 = filtered_vec_sum_arr[1];// / std::max(max_sample[0], max_sample[1]);
+            auto y1 = filtered_vec_avg_arr[0];// / std::max(max_sample[0], max_sample[1]);
+            auto y2 = filtered_vec_avg_arr[1];// / std::max(max_sample[0], max_sample[1]);
+            if (y2 < y1) continue;
             //auto dy = abs(y1 - y2);// / std::max(y1, y2);
             //double dy_dx = 100 * dy / stream.second.size();
-            double dy_dx = y1 > y2 ? y1 / y2 : y2 / y1;
-            dy_dx = 100 * (dy_dx-1);
+            double dy_dx = y2 / y1;// y1 > y2 ? y1 / y2 : y2 / y1;
+            dy_dx = 100 * (dy_dx - 1);
             std::cout << stream.first << ":" << dy_dx << std::endl;
             CAPTURE(stream.first, dy_dx);
             CHECK(dy_dx < DELAY_INCREMENT_THRESHOLD);
@@ -330,7 +341,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             double mean = sum / v.size();
             std::cout << "Delay of " << stream << " = " << mean * 1.5 << std::endl;
             CAPTURE(stream);
-            for (auto it = streams_delay[stream].begin(); it != streams_delay[stream].end(); ++it) {
+            for (auto it = stream_.second.begin(); it != stream_.second.end(); ++it) {
                 CHECK(*it < delay_thresholds[stream]);
             }
         }
