@@ -21,7 +21,7 @@ using namespace librealsense::platform;
 
 #define ITERATIONS_PER_CONFIG 50
 #define DELAY_INCREMENT_THRESHOLD 5 //[%]
-#define SPIKE_THRESHOLD 10 //[%]
+#define SPIKE_THRESHOLD 5 //[%]
 
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
