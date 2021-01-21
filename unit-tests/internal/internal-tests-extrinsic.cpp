@@ -20,8 +20,8 @@ using namespace librealsense;
 using namespace librealsense::platform;
 
 #define ITERATIONS_PER_CONFIG 50
-#define DELAY_INCREMENT_THRESHOLD 3 //[%]
-#define SPIKE_THRESHOLD 5 //[%]
+#define DELAY_INCREMENT_THRESHOLD 5 //[%]
+#define SPIKE_THRESHOLD 4 //[%]
 
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
@@ -270,7 +270,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             std::vector<double> v1_2;
             // filter spikes from both parts
             int i = 0;
-            //double max_sample[2];
+            double max_sample[2];
             for (auto& vec : all)
             {
                 CAPTURE(stream.first, vec.first.size());
@@ -302,9 +302,9 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 CAPTURE(stream.first, vec.second.size());
                 REQUIRE(vec.second.size() > 0);
                 v1_2.insert(std::end(v1_2), std::begin(vec.second), std::end(vec.second));
-                auto max_sample = *std::max_element(std::begin(vec.second), std::end(vec.second));
+                max_sample[i] = *std::max_element(std::begin(vec.second), std::end(vec.second));
                 auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
-                filtered_vec_sum_arr[i] = sum_of_elems / (max_sample * vec.second.size());// { sum_of_elems, vec.second.size() };
+                filtered_vec_sum_arr[i] = sum_of_elems/ vec.second.size();// / (max_sample * vec.second.size());// { sum_of_elems, vec.second.size() };
                 i += 1;
 
             }
@@ -312,9 +312,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             // check if increment between the 2 vectors is below a threshold  
             auto y1 = filtered_vec_sum_arr[0];// / std::max(max_sample[0], max_sample[1]);
             auto y2 = filtered_vec_sum_arr[1];// / std::max(max_sample[0], max_sample[1]);
-            auto dy = abs(y1 - y2);// / std::max(y1, y2);
-            double dy_dx = 100 * dy;// / stream.second.size();
-
+            //auto dy = abs(y1 - y2);// / std::max(y1, y2);
+            //double dy_dx = 100 * dy / stream.second.size();
+            double dy_dx = y1 > y2 ? y1 / y2 : y2 / y1;
+            dy_dx = 100 * (dy_dx-1);
+            std::cout << stream.first << ":" << dy_dx << std::endl;
             CAPTURE(stream.first, dy_dx);
             CHECK(dy_dx < DELAY_INCREMENT_THRESHOLD);
 
