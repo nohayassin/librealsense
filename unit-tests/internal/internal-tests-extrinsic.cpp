@@ -20,7 +20,7 @@ using namespace librealsense;
 using namespace librealsense::platform;
 
 #define ITERATIONS_PER_CONFIG 50
-#define DELAY_INCREMENT_THRESHOLD 5 //[%]
+#define DELAY_INCREMENT_THRESHOLD 3 //[%]
 #define SPIKE_THRESHOLD 5 //[%]
 
 // Require that vector is exactly the zero vector
@@ -245,10 +245,12 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 1. extrinsics table size is perserved over iterations for each stream 
         // 2. no delay increment over iterations
         // 3. "most" iterations have time to first frame delay below a defined threshold
-
-        CAPTURE(extrinsics_table_size);
-        // 1. extrinsics table preserve its size over iterations
-        CHECK(std::adjacent_find(extrinsics_table_size.begin(), extrinsics_table_size.end(), std::not_equal_to<>()) == extrinsics_table_size.end());
+        if (extrinsics_table_size.size())
+        {
+            CAPTURE(extrinsics_table_size);
+            // 1. extrinsics table preserve its size over iterations
+            CHECK(std::adjacent_find(extrinsics_table_size.begin(), extrinsics_table_size.end(), std::not_equal_to<>()) == extrinsics_table_size.end());
+        }
         // 2.  no delay increment over iterations 
         // filter spikes : calc stdev for each half and filter out samples that are not close 
         for (auto& stream : streams_delay)
@@ -263,11 +265,12 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             std::vector<double> filtered_delay2;
             all.push_back({ v1, filtered_delay1 });
             all.push_back({ v2, filtered_delay2 });
-            std::pair<double, double> filtered_vec_sum_arr[2];
+            //std::pair<double, double> filtered_vec_sum_arr[2];
+            double filtered_vec_sum_arr[2];
             std::vector<double> v1_2;
             // filter spikes from both parts
             int i = 0;
-            double max_sample[2];
+            //double max_sample[2];
             for (auto& vec : all)
             {
                 CAPTURE(stream.first, vec.first.size());
@@ -299,18 +302,18 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 CAPTURE(stream.first, vec.second.size());
                 REQUIRE(vec.second.size() > 0);
                 v1_2.insert(std::end(v1_2), std::begin(vec.second), std::end(vec.second));
-                max_sample[i] = *std::max_element(std::begin(vec.second), std::end(vec.second));
+                auto max_sample = *std::max_element(std::begin(vec.second), std::end(vec.second));
                 auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
-                filtered_vec_sum_arr[i] = { sum_of_elems , vec.second.size() };
+                filtered_vec_sum_arr[i] = sum_of_elems / (max_sample * vec.second.size());// { sum_of_elems, vec.second.size() };
                 i += 1;
 
             }
             stream.second = v1_2;
             // check if increment between the 2 vectors is below a threshold  
-            auto y1 = filtered_vec_sum_arr[0].first;
-            auto y2 = filtered_vec_sum_arr[1].first;
-            auto dy = abs(y1 - y2) / std::max(max_sample[0], max_sample[1]);
-            double dy_dx = 100 * dy / stream.second.size();
+            auto y1 = filtered_vec_sum_arr[0];// / std::max(max_sample[0], max_sample[1]);
+            auto y2 = filtered_vec_sum_arr[1];// / std::max(max_sample[0], max_sample[1]);
+            auto dy = abs(y1 - y2);// / std::max(y1, y2);
+            double dy_dx = 100 * dy;// / stream.second.size();
 
             CAPTURE(stream.first, dy_dx);
             CHECK(dy_dx < DELAY_INCREMENT_THRESHOLD);
@@ -319,7 +322,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         // 3. "most" iterations have time to first frame delay below a defined threshold
         for (const auto& stream_ : streams_delay)
         {
+            auto v = stream_.second;
             auto stream = stream_.first;
+            double sum = std::accumulate(v.begin(), v.end(), 0.0);
+            double mean = sum / v.size();
+            std::cout << "Delay of " << stream << " = " << mean * 1.5 << std::endl;
             CAPTURE(stream);
             for (auto it = streams_delay[stream].begin(); it != streams_delay[stream].end(); ++it) {
                 CHECK(*it < delay_thresholds[stream]);
