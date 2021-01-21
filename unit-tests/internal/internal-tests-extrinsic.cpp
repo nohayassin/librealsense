@@ -19,22 +19,10 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
-#define ITERATIONS_PER_CONFIG 50
+#define ITERATIONS_PER_CONFIG 100
 #define DELAY_INCREMENT_THRESHOLD 5 //[%]
 #define SPIKE_THRESHOLD 5 //[%]
 
-// Require that vector is exactly the zero vector
-/*inline void require_zero_vector(const float(&vector)[3])
-{
-    for (int i = 1; i < 3; ++i) REQUIRE(vector[i] == 0.0f);
-}
-
-// Require that matrix is exactly the identity matrix
-inline void require_identity_matrix(const float(&matrix)[9])
-{
-    static const float identity_matrix_3x3[] = { 1,0,0, 0,1,0, 0,0,1 };
-    for (int i = 0; i < 9; ++i) REQUIRE(matrix[i] == approx(identity_matrix_3x3[i]));
-}*/
 bool get_mode(rs2::device& dev, rs2::stream_profile* profile, int mode_index = 0)
 {
     auto sensors = dev.query_sensors();
@@ -54,7 +42,7 @@ bool get_mode(rs2::device& dev, rs2::stream_profile* profile, int mode_index = 0
     return false;
 }
 
-void data_filter(double* filtered_vec_avg_arr,  std::vector<double>& stream_vec, std::string const stream_type)
+void data_filter(double* filtered_vec_avg_arr, std::vector<double>& stream_vec, std::string const stream_type)
 {
     size_t first_size = stream_vec.size() / 2;
     std::vector<double> v1(stream_vec.begin(), stream_vec.begin() + first_size);
@@ -66,10 +54,9 @@ void data_filter(double* filtered_vec_avg_arr,  std::vector<double>& stream_vec,
     all.push_back({ v2, filtered_delay2 });
 
     std::vector<double> v1_2;
-    // filter spikes from both parts
     int i = 0;
     double max_sample[2];
-
+    // filter spikes from both parts
     for (auto& vec : all)
     {
         CAPTURE(stream_type, vec.first.size());
@@ -104,7 +91,7 @@ void data_filter(double* filtered_vec_avg_arr,  std::vector<double>& stream_vec,
         v1_2.insert(std::end(v1_2), std::begin(vec.second), std::end(vec.second));
         max_sample[i] = *std::max_element(std::begin(vec.second), std::end(vec.second));
         auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
-        filtered_vec_avg_arr[i] = sum_of_elems / vec.second.size();// / (max_sample * vec.second.size());// { sum_of_elems, vec.second.size() };
+        filtered_vec_avg_arr[i] = sum_of_elems / vec.second.size();
         i += 1;
 
     }
@@ -212,18 +199,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         std::vector<size_t> extrinsics_table_size;
         std::map<std::string, std::vector<double>> streams_delay; // map to vector to collect all data
         std::map<std::string, std::vector<std::map<unsigned long long, size_t >>> unique_streams_delay;
-        std::map<std::string, double> delay_thresholds;
         std::map<std::string, std::vector<unsigned long long>> frame_number;
         std::map<std::string, size_t> new_frame;
-
-        // TODO : set correct values for thresholds (take threshold of fps=6)
-        delay_thresholds["Accel"] = 1000; // ms
-        delay_thresholds["Color"] = 1000; // ms
-        delay_thresholds["Depth"] = 1000; // ms
-        delay_thresholds["Gyro"] = 1000; // ms
-        delay_thresholds["Infrared 1"] = 1000; // ms
-        delay_thresholds["Infrared 2"] = 1000; // ms
-
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
 
         auto& b = environment::get_instance().get_extrinsics_graph();
@@ -236,7 +213,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, profile.fps); // all streams in cfg
                 cfg_size += 1;
             }
-
             rs2::pipeline pipe;
             rs2::frameset frames;
             auto t1 = std::chrono::system_clock::now().time_since_epoch();
@@ -253,7 +229,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 std::map<std::string, size_t> frames_count_per_stream;
                 while (!condition) // the condition is set to true when at least 20 frames are received per stream
                 {
-                    
+
                     auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
                     frames = pipe.wait_for_frames(); // Wait for next set of frames from the camera
                     for (auto&& f : frames)
@@ -278,7 +254,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                         condition = true;
                         for (auto it = new_frame.begin(); it != new_frame.end(); it++)
                         {
-                            if (it->second < 20)
+                            if (it->second < 10)
                             {
                                 condition = false;
                                 break;
@@ -314,17 +290,18 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         {
             // make sure we have enough data for each stream
             REQUIRE(stream.second.size() > 10);
-            
+
+            // remove first 5 iterations from each stream 
+            stream.second.erase(stream.second.begin(), stream.second.begin() + 5);
+
             double filtered_vec_avg_arr[2];
             data_filter(filtered_vec_avg_arr, stream.second, stream.first);
 
             // check if increment between the 2 vectors is below a threshold  
-            auto y1 = filtered_vec_avg_arr[0];// / std::max(max_sample[0], max_sample[1]);
-            auto y2 = filtered_vec_avg_arr[1];// / std::max(max_sample[0], max_sample[1]);
+            auto y1 = filtered_vec_avg_arr[0];
+            auto y2 = filtered_vec_avg_arr[1];
             if (y2 < y1) continue;
-            //auto dy = abs(y1 - y2);// / std::max(y1, y2);
-            //double dy_dx = 100 * dy / stream.second.size();
-            double dy_dx = y2 / y1;// y1 > y2 ? y1 / y2 : y2 / y1;
+            double dy_dx = y2 / y1;
             dy_dx = 100 * (dy_dx - 1);
             std::cout << stream.first << ":" << dy_dx << std::endl;
             CAPTURE(stream.first, dy_dx);
@@ -332,6 +309,13 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 
         }
         // 3. "most" iterations have time to first frame delay below a defined threshold
+        std::map<std::string, double> delay_thresholds;
+        delay_thresholds["Accel"] = 1200; // ms
+        delay_thresholds["Color"] = 1000; // ms
+        delay_thresholds["Depth"] = 1000; // ms
+        delay_thresholds["Gyro"] = 1200; // ms
+        delay_thresholds["Infrared 1"] = 1000; // ms
+        delay_thresholds["Infrared 2"] = 1000; // ms
         for (const auto& stream_ : streams_delay)
         {
             auto v = stream_.second;
