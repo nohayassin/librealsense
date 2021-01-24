@@ -19,7 +19,7 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
-constexpr int ITERATIONS_PER_CONFIG = 100;
+constexpr int ITERATIONS_PER_CONFIG =  100;
 constexpr int INNER_ITERATIONS_PER_CONFIG = 10;
 constexpr int DELAY_INCREMENT_THRESHOLD = 5; //[%]
 constexpr int DELAY_INCREMENT_THRESHOLD_IMU = 40; //[%]
@@ -235,41 +235,72 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 cfg_size += 1;
             }
             rs2::pipeline pipe;
-            rs2::frameset frames;
-            auto t1 = std::chrono::system_clock::now().time_since_epoch();
-            pipe.start(cfg);
-
-            try
+            //rs2::frameset frames;
+            for (auto it = new_frame.begin(); it != new_frame.end(); it++)
             {
-                for (auto it = new_frame.begin(); it != new_frame.end(); it++)
-                {
-                    it->second = 0;
-                }
-                // to prevent FW issue, at least 20 frames per stream should arrive
-                bool condition = false;
-                std::map<std::string, size_t> frames_count_per_stream;
-                while (!condition) // the condition is set to true when at least 20 frames are received per stream
-                {
+                it->second = 0;
+            }
+            auto t1 = std::chrono::system_clock::now().time_since_epoch();
+            auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
+            bool condition = false;
+            std::mutex mutex;
+            std::mutex mutex_2;
+            //auto callback_pipe_sensor = [&frames, &frame_number, &new_frame, &streams_delay, &milli, &cfg_size, &condition](rs2::frame f)
+            auto callback = [&](const rs2::frame& f)
+            {
+                std::lock_guard<std::mutex> lock(mutex_2);
+                auto stream_type = f.get_profile().stream_name();
+                auto frame_num = f.get_frame_number();
+                auto time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
 
-                    auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
-                    frames = pipe.wait_for_frames(); // Wait for next set of frames from the camera
+                if (std::find(frame_number[stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end())
+                {
+                    if (!new_frame[stream_type])
+                    {
+                        frame_number[stream_type].push_back(frame_num);
+                        //auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(t1).count();
+                        streams_delay[stream_type].push_back(time_of_arrival - milli);
+                        new_frame[stream_type] = true;
+                    }
+                    new_frame[stream_type] += 1;
+                }
+            };
+            auto callback_pipe_sensor = [&](const rs2::frame& ff)
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                if (rs2::frameset fs = ff.as<rs2::frameset>())
+                {
+                    // With callbacks, all synchronized stream will arrive in a single frameset
+                    for (const rs2::frame& f : fs)
+                    {
+                        callback(f);
+                    }
+                }
+                else
+                {
+                    // Stream that bypass synchronization (such as IMU) will produce single frames
+                    callback(ff);
+                }
+                
+                
+            };
+
+
+            pipe.start(cfg);
+            //rs2::pipeline_profile profiles = pipe.start(callback_pipe_sensor);
+            // to prevent FW issue, at least 20 frames per stream should arrive
+            while (!condition) // the condition is set to true when at least 20 frames are received per stream
+            {
+                try
+                {
+                    auto frames = pipe.wait_for_frames();
+                    callback_pipe_sensor(frames);
+                    //
+                    /* // Wait for next set of frames from the camera
                     for (auto&& f : frames)
                     {
-                        auto stream_type = f.get_profile().stream_name();
-                        auto frame_num = f.get_frame_number();
-                        auto time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
-
-                        if (std::find(frame_number[stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end())
-                        {
-                            if (!new_frame[stream_type])
-                            {
-                                frame_number[stream_type].push_back(frame_num);
-                                streams_delay[stream_type].push_back(time_of_arrival - milli);
-                                new_frame[stream_type] = true;
-                            }
-                            new_frame[stream_type] += 1;
-                        }
-                    }
+                        callback_pipe_sensor(f);
+                    }*/
                     if (new_frame.size() == cfg_size)
                     {
                         condition = true;
@@ -284,13 +315,14 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                         // all streams received more than 10 frames
                     }
                 }
-                pipe.stop();
-                extrinsics_table_size.push_back(b._extrinsics.size());
+                catch (...)
+                {
+                    std::cout << "Iteration failed  " << std::endl;
+                }
             }
-            catch (...)
-            {
-                std::cout << "Iteration failed  " << std::endl;
-            }
+            pipe.stop();
+            extrinsics_table_size.push_back(b._extrinsics.size());
+
         }
 
         std::cout << "Analyzing info ..  " << std::endl;
