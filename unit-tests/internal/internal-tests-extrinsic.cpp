@@ -19,11 +19,11 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
-constexpr int ITERATIONS_PER_CONFIG =  100;
+constexpr int ITERATIONS_PER_CONFIG =  50;
 constexpr int INNER_ITERATIONS_PER_CONFIG = 10;
 constexpr int DELAY_INCREMENT_THRESHOLD = 5; //[%]
-constexpr int DELAY_INCREMENT_THRESHOLD_IMU = 40; //[%]
-constexpr int SPIKE_THRESHOLD = 5; //[stdev]
+constexpr int DELAY_INCREMENT_THRESHOLD_IMU = 10; //[%]
+constexpr int SPIKE_THRESHOLD = 2; //[stdev]
 
 // Require that vector is exactly the zero vector
 /*inline void require_zero_vector(const float(&vector)[3])
@@ -57,9 +57,72 @@ bool get_mode(rs2::device& dev, rs2::stream_profile& profile, int mode_index = 0
     return false;
 }
 
-void data_filter(double* filtered_vec_avg_arr, std::vector<double>& stream_vec, std::string const stream_type)
+double line_fitting(const std::vector<double>& y_vec, std::vector<double>& y_fit)
 {
-    size_t first_size = stream_vec.size() / 2;
+    double ysum = std::accumulate(y_vec.begin(), y_vec.end(), 0.0);  //calculate sigma(yi)
+    double xsum = 0;
+    double x2sum = 0;
+    double xysum = 0;
+    auto y_vec_it = y_vec.begin();
+    size_t n = y_vec.size();
+    for (auto i = 0; i < n; i++)
+    {
+        xsum = xsum + i;                        //calculate sigma(xi)
+        //ysum = ysum + y[i];                       
+        //x2sum = x2sum + pow(x[i], 2);                //calculate sigma(x^2i)
+        x2sum = x2sum + pow(i, 2);
+        //xysum = xysum + x[i] * y[i];                    //calculate sigma(xi*yi)
+        xysum = xysum + i * *(y_vec_it + i);
+    }
+    double a = (n * xysum - xsum * ysum) / (n * x2sum - xsum * xsum);            //calculate slope
+    double b = (x2sum * ysum - xsum * xysum) / (x2sum * n - xsum * xsum);            //calculate intercept
+    //double y_fit[n];                        //an array to store the new fitted values of y    
+    for (auto i = 0; i < n; i++)
+    {
+        // y_fit[i] = a * x[i] + b;                    //to calculate y(fitted) at given x points
+        y_fit.push_back(a * i + b);
+    }
+    return a; // return the slope for later usage when checking delay increment 
+}
+//void data_filter(double* filtered_vec_avg_arr, std::vector<double>& stream_vec, std::vector<double>& filtered_stream_vec, std::string const stream_type)
+double data_filter(const std::vector<double>& stream_vec, std::vector<double>& filtered_stream_vec, std::string const stream_type)
+{
+    std::vector<double> y_fit;
+    double slope = line_fitting(stream_vec, y_fit);
+    
+    auto y_fit_it = y_fit.begin();
+    auto stream_vec_it = stream_vec.begin();
+    std::vector<double> diff_y_fit;
+    for (auto i = 0; i < stream_vec.size(); i++)
+    {
+        double diff = abs(*(y_fit_it+i)- *(stream_vec_it+i));
+        diff_y_fit.push_back(diff);
+    }
+    // calc stdev from fitted linear line
+    double sq_sum = std::inner_product(diff_y_fit.begin(), diff_y_fit.end(), diff_y_fit.begin(), 0.0);
+    double stdev = std::sqrt(sq_sum / diff_y_fit.size());
+
+    // calc % of each sample from stdev
+    std::vector<double> samples_stdev(diff_y_fit.size());
+    auto v_size = diff_y_fit.size();
+    std::transform(diff_y_fit.begin(), diff_y_fit.end(), samples_stdev.begin(), [stdev](double d) {
+        d = d < 0 ? -d : d;
+        auto val = d/ stdev;
+        return  val >= 0 ? val : -val;
+        }
+    );
+
+    // filter spikes
+    auto samples_stdev_it = samples_stdev.begin();
+    stream_vec_it = stream_vec.begin();
+    for (auto i = 0; i < samples_stdev.size(); i++)
+    {
+        if (*(samples_stdev_it + i) > SPIKE_THRESHOLD) continue;
+        filtered_stream_vec.push_back(*(stream_vec_it + i));
+    }
+
+    return slope;
+    /*size_t first_size = stream_vec.size() / 2;
     std::vector<double> v1(stream_vec.begin(), stream_vec.begin() + first_size);
     std::vector<double> v2(stream_vec.begin() + first_size, stream_vec.end());
     std::vector<std::pair<std::vector<double>, std::vector<double>>> all;
@@ -111,6 +174,8 @@ void data_filter(double* filtered_vec_avg_arr, std::vector<double>& stream_vec, 
 
     }
     stream_vec = v1_2;
+    */
+
 }
 TEST_CASE("Extrinsic graph management", "[live][multicam]")
 {
@@ -363,15 +428,28 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             for (auto& stream : streams_delay)
             {
                 // make sure we have enough data for each stream
-                REQUIRE(stream.second.size() > 10);
+                REQUIRE(stream.second.size() > 0);
 
                 // remove first 5 iterations from each stream 
                 stream.second.erase(stream.second.begin(), stream.second.begin() + 5);
 
                 double filtered_vec_avg_arr[2];
-                data_filter(filtered_vec_avg_arr, stream.second, stream.first);
+                //double slope = data_filter(filtered_vec_avg_arr, stream.second, stream.first);
+                std::vector<double> filtered_stream_vec;
+                std::vector<double> filtered_stream_vec_2;
+                double slope1 = data_filter(stream.second, filtered_stream_vec, stream.first);
+                // check slope of filtered data
+                double slope2 = data_filter(filtered_stream_vec, filtered_stream_vec_2, stream.first);
+                // set origin data to filtered data
+                stream.second = filtered_stream_vec;
+                // check slope value against threshold
+                auto threshold = DELAY_INCREMENT_THRESHOLD;
+                // IMU streams have different threshold
+                if (stream.first == "Accel" || stream.first == "Gyro") threshold = DELAY_INCREMENT_THRESHOLD_IMU;
+                CAPTURE(stream.first, slope2, threshold);
+                CHECK(slope2 < threshold);
 
-                // check if increment between the 2 vectors is below a threshold  
+                /*// check if increment between the 2 vectors is below a threshold  
                 auto y1 = filtered_vec_avg_arr[0];
                 auto y2 = filtered_vec_avg_arr[1];
                 // if no delay increment is detected over iterations no need to compare against a threshold
@@ -384,7 +462,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 // IMU streams have different threshold
                 if (stream.first == "Accel" || stream.first == "Gyro") threshold = DELAY_INCREMENT_THRESHOLD_IMU;
                 CAPTURE(stream.first, dy_dx, threshold);
-                CHECK(dy_dx < threshold);
+                CHECK(dy_dx < threshold);*/
 
             }
             // 3. "most" iterations have time to first frame delay below a defined threshold
