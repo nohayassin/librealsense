@@ -21,8 +21,8 @@ using namespace librealsense::platform;
 
 constexpr int ITERATIONS_PER_CONFIG =  50;
 constexpr int INNER_ITERATIONS_PER_CONFIG = 10;
-constexpr int DELAY_INCREMENT_THRESHOLD = 5; //[%]
-constexpr int DELAY_INCREMENT_THRESHOLD_IMU = 10; //[%]
+constexpr int DELAY_INCREMENT_THRESHOLD = 3; //[%]
+constexpr int DELAY_INCREMENT_THRESHOLD_IMU = 8; //[%]
 constexpr int SPIKE_THRESHOLD = 2; //[stdev]
 
 // Require that vector is exactly the zero vector
@@ -122,59 +122,6 @@ double data_filter(const std::vector<double>& stream_vec, std::vector<double>& f
     }
 
     return slope;
-    /*size_t first_size = stream_vec.size() / 2;
-    std::vector<double> v1(stream_vec.begin(), stream_vec.begin() + first_size);
-    std::vector<double> v2(stream_vec.begin() + first_size, stream_vec.end());
-    std::vector<std::pair<std::vector<double>, std::vector<double>>> all;
-    std::vector<double> filtered_delay1;
-    std::vector<double> filtered_delay2;
-    all.push_back({ v1, filtered_delay1 });
-    all.push_back({ v2, filtered_delay2 });
-
-    std::vector<double> v1_2;
-    int i = 0;
-    double max_sample[2];
-    // filter spikes from both parts
-    for (auto& vec : all)
-    {
-        CAPTURE(stream_type, vec.first.size());
-        REQUIRE(vec.first.size() > 2);
-        // TODO : credate line fitting function to filter spikes
-        auto v = vec.first;
-        double sum = std::accumulate(v.begin(), v.end(), 0.0);
-        double avg = sum / v.size();
-        std::vector<double> diff(v.size());
-        std::transform(v.begin(), v.end(), diff.begin(), std::bind2nd(std::minus<double>(), avg));
-        double sq_sum = std::inner_product(diff.begin(), diff.end(), diff.begin(), 0.0);
-        double stdev = std::sqrt(sq_sum / v.size()); //sqr(siqma((di-avg)^2)))/size
-        std::vector<double> sample_stdev_weight(v.size());
-        auto v_size = v.size();
-        std::transform(v.begin(), v.end(), sample_stdev_weight.begin(), [stdev, v_size, avg](double d) {
-            d = d < 0 ? -d : d;
-            auto val = (d - avg)/v_size;
-            val = 100 * val / stdev;
-            return  val > 0 ? val : -val;
-            }
-        );
-        auto stdev_diff_it = sample_stdev_weight.begin();
-        auto v_it = v.begin();
-        for (auto i = 0; i < v.size(); i++)
-        {
-            if (*(stdev_diff_it + i) > SPIKE_THRESHOLD) continue;
-            vec.second.push_back(*(v_it + i));
-        }
-        // make sure after filtering there still data in both parts 
-        CAPTURE(stream_type, vec.second.size());
-        REQUIRE(vec.second.size() > 0);
-        v1_2.insert(std::end(v1_2), std::begin(vec.second), std::end(vec.second));
-        max_sample[i] = *std::max_element(std::begin(vec.second), std::end(vec.second));
-        auto sum_of_elems = std::accumulate(vec.second.begin(), vec.second.end(), 0);
-        filtered_vec_avg_arr[i] = sum_of_elems / vec.second.size();
-        i += 1;
-
-    }
-    stream_vec = v1_2;
-    */
 
 }
 TEST_CASE("Extrinsic graph management", "[live][multicam]")
@@ -357,11 +304,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                         // Stream that bypass synchronization (such as IMU) will produce single frames
                         process_frame(ff);
                     }
-
-
                 };
-
-
                 if (is_pipe)
                 {
                     rs2::pipeline_profile profiles = pipe.start(cfg, callback_pipe_sensor);
@@ -402,9 +345,15 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 }
                 else
                 {
+                    std::this_thread::sleep_for(std::chrono::seconds(60));
+                    // Stop & flush all active sensors. The separation is intended to semi-confirm the FPS
                     for (auto s : res.first)
                     {
                         s.stop();
+                    }
+                    for (auto s : res.first)
+                    {
+                        s.close();
                     }
                 }
                 extrinsics_table_size.push_back(b._extrinsics.size());
@@ -428,7 +377,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             for (auto& stream : streams_delay)
             {
                 // make sure we have enough data for each stream
-                REQUIRE(stream.second.size() > 0);
+                REQUIRE(stream.second.size() > 10);
 
                 // remove first 5 iterations from each stream 
                 stream.second.erase(stream.second.begin(), stream.second.begin() + 5);
@@ -448,21 +397,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 if (stream.first == "Accel" || stream.first == "Gyro") threshold = DELAY_INCREMENT_THRESHOLD_IMU;
                 CAPTURE(stream.first, slope2, threshold);
                 CHECK(slope2 < threshold);
-
-                /*// check if increment between the 2 vectors is below a threshold  
-                auto y1 = filtered_vec_avg_arr[0];
-                auto y2 = filtered_vec_avg_arr[1];
-                // if no delay increment is detected over iterations no need to compare against a threshold
-                if (y2 < y1) continue;
-                double dy_dx = y2 / y1;
-                // calculate delay increment percentage
-                dy_dx = 100 * (dy_dx - 1);
-                std::cout << stream.first << " : " << dy_dx << std::endl;
-                auto threshold = DELAY_INCREMENT_THRESHOLD;
-                // IMU streams have different threshold
-                if (stream.first == "Accel" || stream.first == "Gyro") threshold = DELAY_INCREMENT_THRESHOLD_IMU;
-                CAPTURE(stream.first, dy_dx, threshold);
-                CHECK(dy_dx < threshold);*/
 
             }
             // 3. "most" iterations have time to first frame delay below a defined threshold
