@@ -223,6 +223,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         std::map<std::string, size_t> extrinsic_graph_at_sensor;
 
         auto& b = environment::get_instance().get_extrinsics_graph();
+        
         for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
         {
             rs2::config cfg;
@@ -286,21 +287,21 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             };
 
 
-            pipe.start(cfg);
+            //pipe.start(cfg);
+            for (auto s : res.first)
+            {
+                s.start(callback_pipe_sensor);
+            }
             //rs2::pipeline_profile profiles = pipe.start(callback_pipe_sensor);
+
             // to prevent FW issue, at least 20 frames per stream should arrive
             while (!condition) // the condition is set to true when at least 20 frames are received per stream
             {
                 try
                 {
-                    auto frames = pipe.wait_for_frames();
-                    callback_pipe_sensor(frames);
-                    //
-                    /* // Wait for next set of frames from the camera
-                    for (auto&& f : frames)
-                    {
-                        callback_pipe_sensor(f);
-                    }*/
+                    //auto frames = pipe.wait_for_frames();
+                   // callback_pipe_sensor(frames);
+
                     if (new_frame.size() == cfg_size)
                     {
                         condition = true;
@@ -320,7 +321,11 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                     std::cout << "Iteration failed  " << std::endl;
                 }
             }
-            pipe.stop();
+            //pipe.stop();
+            for (auto s : res.first)
+            {
+                s.stop();
+            }
             extrinsics_table_size.push_back(b._extrinsics.size());
 
         }
