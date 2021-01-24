@@ -217,8 +217,8 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
         auto video = mode.as<rs2::video_stream_profile>();
         auto res = configure_all_supported_streams(dev, video.width(), video.height(), mode.fps());
 
-        bool is_pipe_test[2] = { true, false };
-
+        bool is_pipe_test[2] = { false, true};
+        
         for (auto is_pipe : is_pipe_test)
         {
             // collect a log that contains info about 20 iterations for each stream
@@ -252,6 +252,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
             {
                 rs2::config cfg;
+                rs2::pipeline pipe;
                 size_t cfg_size = 0;
                 for (auto profile : res.second)
                 {
@@ -260,7 +261,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                     cfg.enable_stream(profile.stream, profile.index, profile.width, profile.height, profile.format, fps); // all streams in cfg
                     cfg_size += 1;
                 }
-                rs2::pipeline pipe;
+                
                 for (auto it = new_frame.begin(); it != new_frame.end(); it++)
                 {
                     it->second = 0;
@@ -313,6 +314,7 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                     for (auto s : res.first)
                     {
                         s.start(callback_pipe_sensor);
+                        //s.open(s.get_stream_profiles());
                     }
                 }
                 // to prevent FW issue, at least 20 frames per stream should arrive
@@ -345,16 +347,15 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
                 }
                 else
                 {
-                    std::this_thread::sleep_for(std::chrono::seconds(60));
                     // Stop & flush all active sensors. The separation is intended to semi-confirm the FPS
                     for (auto s : res.first)
                     {
                         s.stop();
                     }
-                    for (auto s : res.first)
+                    /*for (auto s : res.first)
                     {
                         s.close();
-                    }
+                    }*/
                 }
                 extrinsics_table_size.push_back(b._extrinsics.size());
 
