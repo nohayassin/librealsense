@@ -19,7 +19,7 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
-constexpr int ITERATIONS_PER_CONFIG = 15;
+constexpr int ITERATIONS_PER_CONFIG = 100;
 constexpr int INNER_ITERATIONS_PER_CONFIG = 10;
 constexpr int DELAY_INCREMENT_THRESHOLD = 3; //[%]
 constexpr int DELAY_INCREMENT_THRESHOLD_IMU = 8; //[%]
@@ -186,18 +186,10 @@ TEST_CASE("Extrinsic graph management", "[live][multicam]")
 }
 TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 {
-    
-    //rs2::log_to_console(RS2_LOG_SEVERITY_DEBUG);
+    // Require at least one device to be plugged in
     rs2::context ctx;
-    if (make_context(SECTION_FROM_TEST_NAME, &ctx))
     {
-        rs2::log_to_file(RS2_LOG_SEVERITY_DEBUG, "frame_delay_log.txt");
-
         std::cout << "Pipe - Extrinsic memory leak detection started" << std::endl;
-        bool is_pipe_test[2] = { true, false };
-
-        for (auto is_pipe : is_pipe_test)
-        {
         auto list = ctx.query_devices();
         REQUIRE(list.size());
         auto dev = list.front();
@@ -218,9 +210,13 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             mode_index++;
         } while (mode.fps() != req_fps);
 
-       
+        auto video = mode.as<rs2::video_stream_profile>();
+        auto res = configure_all_supported_streams(dev, video.width(), video.height(), mode.fps());
 
-        
+        bool is_pipe_test[2] = { false, true };
+
+        for (auto is_pipe : is_pipe_test)
+        {
             // collect a log that contains info about 20 iterations for each stream
             // the info should include:
             // 1. extrinsics table size
@@ -230,9 +226,6 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             // 1. extrinsics table size is perserved over iterations for each stream 
             // 2. no delay increment over iterations
             // 3. "most" iterations have time to first frame delay below a defined threshold
-
-            auto video = mode.as<rs2::video_stream_profile>();
-            auto res = configure_all_supported_streams(dev, video.width(), video.height(), mode.fps());
 
             std::vector<size_t> extrinsics_table_size;
             std::map<std::string, std::vector<double>> streams_delay; // map to vector to collect all data
