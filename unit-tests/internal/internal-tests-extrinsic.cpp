@@ -19,7 +19,7 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
-constexpr int ITERATIONS_PER_CONFIG = 50;
+constexpr int ITERATIONS_PER_CONFIG = 15;
 constexpr int INNER_ITERATIONS_PER_CONFIG = 10;
 constexpr int DELAY_INCREMENT_THRESHOLD = 3; //[%]
 constexpr int DELAY_INCREMENT_THRESHOLD_IMU = 8; //[%]
@@ -67,19 +67,15 @@ double line_fitting(const std::vector<double>& y_vec, std::vector<double>& y_fit
     size_t n = y_vec.size();
     for (auto i = 0; i < n; i++)
     {
-        xsum = xsum + i;                        //calculate sigma(xi)
-        //ysum = ysum + y[i];                       
-        //x2sum = x2sum + pow(x[i], 2);                //calculate sigma(x^2i)
-        x2sum = x2sum + pow(i, 2);
-        //xysum = xysum + x[i] * y[i];                    //calculate sigma(xi*yi)
+        xsum = xsum + i;  //calculate sigma(xi)                                   
+        x2sum = x2sum + pow(i, 2); //calculate sigma(x^2i)
         xysum = xysum + i * *(y_vec_it + i);
     }
-    double a = (n * xysum - xsum * ysum) / (n * x2sum - xsum * xsum);            //calculate slope
-    double b = (x2sum * ysum - xsum * xysum) / (x2sum * n - xsum * xsum);            //calculate intercept
-    //double y_fit[n];                        //an array to store the new fitted values of y    
+    double a = (n * xysum - xsum * ysum) / (n * x2sum - xsum * xsum);      //calculate slope
+    double b = (x2sum * ysum - xsum * xysum) / (x2sum * n - xsum * xsum);  //calculate intercept   
     for (auto i = 0; i < n; i++)
     {
-        // y_fit[i] = a * x[i] + b;                    //to calculate y(fitted) at given x points
+        //calculate y(fitted) at given x points             
         y_fit.push_back(a * i + b);
     }
     return a; // return the slope for later usage when checking delay increment 
@@ -190,10 +186,18 @@ TEST_CASE("Extrinsic graph management", "[live][multicam]")
 }
 TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
 {
-    // Require at least one device to be plugged in
+    
+    //rs2::log_to_console(RS2_LOG_SEVERITY_DEBUG);
     rs2::context ctx;
+    if (make_context(SECTION_FROM_TEST_NAME, &ctx))
     {
+        rs2::log_to_file(RS2_LOG_SEVERITY_DEBUG, "frame_delay_log.txt");
+
         std::cout << "Pipe - Extrinsic memory leak detection started" << std::endl;
+        bool is_pipe_test[2] = { true, false };
+
+        for (auto is_pipe : is_pipe_test)
+        {
         auto list = ctx.query_devices();
         REQUIRE(list.size());
         auto dev = list.front();
@@ -214,13 +218,9 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             mode_index++;
         } while (mode.fps() != req_fps);
 
-        auto video = mode.as<rs2::video_stream_profile>();
-        auto res = configure_all_supported_streams(dev, video.width(), video.height(), mode.fps());
+       
 
-        bool is_pipe_test[2] = { false, true };
-
-        for (auto is_pipe : is_pipe_test)
-        {
+        
             // collect a log that contains info about 20 iterations for each stream
             // the info should include:
             // 1. extrinsics table size
@@ -230,6 +230,9 @@ TEST_CASE("Pipe - Extrinsic memory leak detection", "[live]")
             // 1. extrinsics table size is perserved over iterations for each stream 
             // 2. no delay increment over iterations
             // 3. "most" iterations have time to first frame delay below a defined threshold
+
+            auto video = mode.as<rs2::video_stream_profile>();
+            auto res = configure_all_supported_streams(dev, video.width(), video.height(), mode.fps());
 
             std::vector<size_t> extrinsics_table_size;
             std::map<std::string, std::vector<double>> streams_delay; // map to vector to collect all data
