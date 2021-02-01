@@ -105,8 +105,8 @@ TEST_CASE("D455 Frame Drops", "[live]")
         rs2::log_to_file(RS2_LOG_SEVERITY_DEBUG, "lrs_log.txt");
 
         std::cout << "D455 Frame Drops started" << std::endl;
-        for (auto i = 0; i < 1; i++)
-                    {
+        for (auto i = 0; i < 10; i++)
+        {
             auto list = ctx.query_devices();
             REQUIRE(list.size());
             auto dev = list.front();
@@ -158,6 +158,10 @@ TEST_CASE("D455 Frame Drops", "[live]")
                 auto start_time_milli = std::chrono::duration_cast<std::chrono::milliseconds>(start_time).count();
                 std::mutex mutex;
                 std::mutex mutex_2;
+                int prev_hw_time_of_arrival =0;
+                unsigned long long prev_frame_num=0;
+                std::vector<unsigned long long> prev_frames_number;
+                std::vector<unsigned long long> curr_frames_number;
                 auto process_frame = [&](const rs2::frame& f)
                 {
                     auto now = std::chrono::system_clock::now().time_since_epoch();
@@ -165,8 +169,20 @@ TEST_CASE("D455 Frame Drops", "[live]")
                     std::lock_guard<std::mutex> lock(mutex_2);
                     auto stream_type = f.get_profile().stream_name();
                     auto frame_num = f.get_frame_number();
-                    auto time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
-                    std::cout << "frame_num = "<< frame_num <<", time_of_arrival diff=" << diff<<std::endl;
+                    auto system_time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
+                    auto hw_time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP);// usec
+                    auto hw_diff = hw_time_of_arrival-prev_hw_time_of_arrival;
+                    //std::cout << " - frame_num = "<< frame_num <<"-  diff=" << diff<< " - sys: " << system_time_of_arrival<< " - hw : " << hw_time_of_arrival<< " - hw diff: "<< hw_diff<<std::endl;
+//                    std::cout <<frame_num <<" - hw : " << hw_time_of_arrival<< " - hw diff: "<< hw_diff<<std::endl;
+                    //std::cout <<frame_num <<" " << system_time_of_arrival<< " " << hw_time_of_arrival<<std::endl;
+                    //std::cout <<frame_num <<" " << prev_frame_num+1<<std::endl;
+                    auto prev_hw_time_of_arrival = hw_time_of_arrival;
+                    prev_frames_number.push_back(prev_frame_num);
+                    curr_frames_number.push_back(frame_num-1);
+
+                    //CAPTURE(prev_frame_num == frame_num-1);
+                    prev_frame_num = frame_num;
+
 
                 };
                 auto frame_callback = [&](const rs2::frame& f)
@@ -189,10 +205,21 @@ TEST_CASE("D455 Frame Drops", "[live]")
 
                 ss.open(sensor_stream_profiles);
                 ss.start(frame_callback);
-                std::this_thread::sleep_for(std::chrono::seconds(2));
+                std::this_thread::sleep_for(std::chrono::seconds(30));
                 ss.stop();
 
                 ss.close();
+
+                if( equal(curr_frames_number.begin(), curr_frames_number.end(), prev_frames_number.begin()) )
+                    std::cout <<"-------- EQUAL ---------" <<std::endl;
+                else std::cout <<"-------- NOT EQUAL ---------" <<std::endl;
+                auto prev_it = prev_frames_number.begin();
+                auto curr_it = curr_frames_number.begin();
+                for(auto k=0; k < curr_frames_number.size(); k++)
+                {
+                    CAPTURE(*(prev_it+k) == *(curr_it+k));
+                    if (*(prev_it+k) != *(curr_it+k)) std::cout <<"k = " <<k <<std::endl;
+                }
         }
 }
 }

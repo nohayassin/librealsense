@@ -318,11 +318,24 @@ namespace librealsense
             auto&& req_profile_base = std::dynamic_pointer_cast<stream_profile_base>(req_profile);
             try
             {
+                //NOHA
+                //unsigned long long last_frame_number_noha = 0;
+                //rs2_time_t last_timestamp_noha = 0;
+
+
                 unsigned long long last_frame_number = 0;
                 rs2_time_t last_timestamp = 0;
                 _device->probe_and_commit(req_profile_base->get_backend_profile(),
                     [this, req_profile_base, req_profile, last_frame_number, last_timestamp](platform::stream_profile p, platform::frame_object f, std::function<void()> continuation) mutable
                 {
+                   // platform::frame_object ff;
+                    /*const auto&& fr_noha = generate_frame_from_data(f, _timestamp_reader.get(), last_timestamp, last_frame_number, req_profile);
+                    auto&& frame_counter_noha = fr_noha->additional_data.frame_number;
+                    auto&& timestamp_noha = fr_noha->additional_data.timestamp;
+
+                     LOG_DEBUG("NOHA :: frame num = " << frame_counter_noha << " , timestamp = " << timestamp_noha);*/
+
+
                     const auto&& system_time = environment::get_instance().get_time_service()->get_time();
                     const auto&& fr = generate_frame_from_data(f, _timestamp_reader.get(), last_timestamp, last_frame_number, req_profile_base);
                     const auto&& requires_processing = true; // TODO - Ariel add option
