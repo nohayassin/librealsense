@@ -173,9 +173,9 @@ TEST_CASE("D455 Frame Drops", "[live]")
                     auto hw_time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP);// usec
                     auto hw_diff = hw_time_of_arrival-prev_hw_time_of_arrival;
                     //std::cout << " - frame_num = "<< frame_num <<"-  diff=" << diff<< " - sys: " << system_time_of_arrival<< " - hw : " << hw_time_of_arrival<< " - hw diff: "<< hw_diff<<std::endl;
-//                    std::cout <<frame_num <<" - hw : " << hw_time_of_arrival<< " - hw diff: "<< hw_diff<<std::endl;
+                    //std::cout <<frame_num <<" - hw : " << hw_time_of_arrival<< " - hw diff: "<< hw_diff<<std::endl;
                     //std::cout <<frame_num <<" " << system_time_of_arrival<< " " << hw_time_of_arrival<<std::endl;
-                    std::cout <<frame_num <<" " << hw_time_of_arrival<<std::endl;
+                    //std::cout <<frame_num <<" " << hw_time_of_arrival<<std::endl;
                     //std::cout <<frame_num <<std::endl;
                     auto prev_hw_time_of_arrival = hw_time_of_arrival;
                     if(prev_frame_num)
