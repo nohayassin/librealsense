@@ -868,7 +868,7 @@ namespace librealsense
         if (!_is_streaming)
             throw wrong_api_call_sequence_exception("stop_streaming() failed. Hid device is not streaming!");
 
-
+         
         _hid_device->stop_capture();
         _is_streaming = false;
         _source.flush();

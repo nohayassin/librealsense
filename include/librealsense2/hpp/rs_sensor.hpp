@@ -102,7 +102,7 @@ namespace rs2
     class sensor : public options
     {
     public:
-
+        //std::atomic<bool> synchronization_enable;
         using options::supports;
         /**
         * open sensor for exclusive access, by committing to a configuration

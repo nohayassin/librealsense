@@ -199,9 +199,21 @@ private:
             *p_mean_depth = pixel_count ? total_depth / pixel_count : 0;
         return pixel_count ? total_luminance / pixel_count : 1;
     }
-
+    void clear_faces() override
+    {
+        std::cout << "NOHA :: clear_faces :: _faces.clear" << std::endl;
+        _objects->clear();
+        
+    }
     void worker_body( rs2::frameset fs ) override
     {
+        //_faces.clear();
+        if (!fs)
+        {
+            std::cout <<"NOHA :: worker_body :: _faces.clear" <<std::endl;
+            _faces.clear();
+            return;
+        }
         // A color video frame is the minimum we need for detection
         auto cf = fs.get_color_frame();
         if( !cf )

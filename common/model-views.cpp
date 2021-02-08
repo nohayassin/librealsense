@@ -38,6 +38,8 @@
 #include "metadata-helper.h"
 #include "calibration-model.h"
 
+#include "option.h"
+
 using namespace rs400;
 using namespace nlohmann;
 using namespace rs2::sw_update;
@@ -1919,9 +1921,9 @@ namespace rs2
             detected_objects->clear();
             detected_objects->sensor_is_on = false;
         }
-
+        //s->synchronization_enable = true;
         s->stop();
-
+       
         _options_invalidated = true;
 
         queues.foreach([&](frame_queue& q)
@@ -1965,12 +1967,25 @@ namespace rs2
     //The function decides if specific frame should be sent to the syncer
     bool subdevice_model::is_synchronized_frame(viewer_model& viewer, const frame& f)
     {
+        //std::cout << "NOHA :: subdevice_model::is_synchronized_frame (0)" << std::endl;
         if (zero_order_artifact_fix && zero_order_artifact_fix->is_enabled() &&
             (f.get_profile().stream_type() == RS2_STREAM_DEPTH || f.get_profile().stream_type() == RS2_STREAM_INFRARED || f.get_profile().stream_type() == RS2_STREAM_CONFIDENCE))
+        {
+            //std::cout << "NOHA :: subdevice_model::is_synchronized_frame (1)" << std::endl;
             return true;
+        }
         if (!viewer.is_3d_view || viewer.is_3d_depth_source(f) || viewer.is_3d_texture_source(f))
+        {
+            //std::cout << "NOHA :: subdevice_model::is_synchronized_frame (2)" << std::endl; 
             return true;
-
+        }
+        // TODO :: add condition of IMU was on then off
+        if (viewer.imu_on_off)
+        {
+            viewer.imu_on_off = false;
+            return true;
+        }
+        //std::cout << "NOHA :: subdevice_model::is_synchronized_frame (3)" << std::endl;
         return false;
     }
 
@@ -2005,12 +2020,22 @@ namespace rs2
         try {
             s->start([&, syncer](frame f)
             {
+                    //std::cout << "NOHA :: subdevice_model::play : (1)"<<std::endl;
+                    viewer.streams;
+                    /*auto &ss = std::make_shared<librealsense::hid_sensor>(s);
+                    if (ss->synchronization_enable)
+                    {
+                        std::cout << "NOHA :: subdevice_model::play : ss->synchronization_enable :: XXXXX" << std::endl;
+                        viewer.synchronization_enable = true;
+                    }*/
                 if (viewer.synchronization_enable && is_synchronized_frame(viewer, f))
                 {
+                    //std::cout << "NOHA :: subdevice_model::play : (2)" << std::endl;
                     syncer->invoke(f);
                 }
                 else
                 {
+                   // std::cout << "NOHA :: subdevice_model::play : (3)" << ", viewer.synchronization_enable = "<< viewer.synchronization_enable<<" - imu_on = " << viewer.imu_on << " - imu_on_off = " << viewer.imu_on_off << std::endl;
                     auto id = f.get_profile().unique_id();
                     viewer.ppf.frames_queue[id].enqueue(f);
 
@@ -3847,12 +3872,34 @@ namespace rs2
                     (friendly_name.find("Motion") != std::string::npos))
                 {
                     viewer.synchronization_enable = false;
+                    viewer.imu_on = true;
+                    viewer.imu_on_off = false;
+                }
+                else
+                {
+                    viewer.synchronization_enable = true;
+                    if (viewer.imu_on)
+                    {
+                        viewer.imu_on = false;
+                        viewer.imu_on_off = true;
+                    }
                 }
                 sub->play(profiles, viewer, dev_syncer);
 
                 for (auto&& profile : profiles)
                 {
                     viewer.begin_stream(sub, profile);
+                }
+            }
+            else
+            {
+                std::cout << "NOHA :: device_model::play_defaults"<<std::endl;
+                std::string friendly_name = sub->s->get_info(RS2_CAMERA_INFO_NAME);
+                if ((friendly_name.find("Tracking") != std::string::npos) ||
+                    (friendly_name.find("Motion") != std::string::npos))
+                {
+                    viewer.synchronization_enable = true;
+                    viewer.imu_on_off = true;
                 }
             }
         }
@@ -6345,7 +6392,20 @@ namespace rs2
                                         ((friendly_name.find("Tracking") != std::string::npos) ||
                                         (friendly_name.find("Motion") != std::string::npos)))
                                     {
+                                        auto val = sub->s->is<motion_sensor>();
+                                        //auto ss = std::make_shared<motion_sensor>(sub->s);
+                                        //ss->synchronization_enable = false;
                                         viewer.synchronization_enable = false;
+                                        viewer.imu_on = true;
+                                    }
+                                    else
+                                    {
+                                        viewer.synchronization_enable =  true;
+                                        if (viewer.imu_on)
+                                        {
+                                            viewer.imu_on = false;
+                                            viewer.imu_on_off = true;
+                                        }
                                     }
                                     _update_readonly_options_timer.set_expired();
                                     sub->play(profiles, viewer, dev_syncer);
@@ -6380,7 +6440,13 @@ namespace rs2
                         if (ImGui::Button(label.c_str(), { 30,30 }))
                         {
                             sub->stop(viewer);
-
+                            std::string friendly_name = sub->s->get_info(RS2_CAMERA_INFO_NAME);
+                            if ((friendly_name.find("Tracking") != std::string::npos) ||
+                                (friendly_name.find("Motion") != std::string::npos))
+                            {
+                                viewer.synchronization_enable = true;
+                            }
+                            
                             if (!std::any_of(subdevices.begin(), subdevices.end(),
                                 [](const std::shared_ptr<subdevice_model>& sm)
                             {

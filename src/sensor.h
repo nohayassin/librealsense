@@ -85,6 +85,7 @@ namespace librealsense
         rs2_format fourcc_to_rs2_format(uint32_t format) const;
         rs2_stream fourcc_to_rs2_stream(uint32_t fourcc_format) const;
 
+        
     protected:
         void raise_on_before_streaming_changes(bool streaming);
         void set_active_streams(const stream_profiles& requests);
@@ -292,7 +293,7 @@ namespace librealsense
         std::vector<uint8_t> get_custom_report_data(const std::string& custom_sensor_name,
                                                     const std::string& report_name,
                                                     platform::custom_sensor_report_field report_field) const;
-
+       
     protected:
         stream_profiles init_stream_profiles() override;
 
@@ -311,6 +312,7 @@ namespace librealsense
         std::unique_ptr<frame_timestamp_reader> _hid_iio_timestamp_reader;
         std::unique_ptr<frame_timestamp_reader> _custom_hid_timestamp_reader;
 
+        
         stream_profiles get_sensor_profiles(std::string sensor_name) const;
 
         const std::string& rs2_stream_to_sensor_name(rs2_stream stream) const;

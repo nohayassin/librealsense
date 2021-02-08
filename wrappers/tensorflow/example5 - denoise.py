@@ -15,7 +15,7 @@ pipeline.start(config)
 channels = 2
 cropped_w, cropped_h = 480, 480
 
-test_model_name = ""
+test_model_name = r"C:\Users\nyassin\Downloads\DEPTH_20200924-092649.model" #r"C:\Users\nyassin\OneDrive - Intel Corporation\Documents\ML\models\20200924-092649\DEPTH_20200924-092649.model"
 if (len(sys.argv) > 1):
     test_model_name = str(sys.argv[1])
 
