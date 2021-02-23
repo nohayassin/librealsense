@@ -126,18 +126,52 @@ namespace librealsense
                 multistream() {}
 
                 explicit multistream(std::map<int, sensor_interface*> results,
-                                     std::map<index_type, std::shared_ptr<stream_profile_interface>> profiles,
-                                     std::map<int, stream_profiles> dev_to_profiles)
-                        :   _profiles(std::move(profiles)),
-                            _dev_to_profiles(std::move(dev_to_profiles)),
-                            _results(std::move(results))
-                {}
+                    std::map<index_type, std::shared_ptr<stream_profile_interface>> profiles,
+                    std::map<int, stream_profiles> dev_to_profiles)
+                    : _profiles(std::move(profiles)),
+                    _dev_to_profiles(std::move(dev_to_profiles)),
+                    _results(std::move(results))
+                {
+                    _rgb_index = -1;
+                    _depth_index = -1;
+                    _depth_and_rgb = false;
+                    for (auto&& kvp : _dev_to_profiles) {
+                        auto ss = kvp.second;
+                        for (auto& val : ss)
+                        {
+                            if (val->get_stream_type() == RS2_STREAM_COLOR) _rgb_index = kvp.first;
+                            if (val->get_stream_type() == RS2_STREAM_DEPTH) _depth_index = kvp.first;
+                        }
+                    }
+
+                    if (_rgb_index >= 0 && _depth_index >= 0)
+                    {
+                        // swap 
+                        auto& rgb = _dev_to_profiles[_rgb_index];
+                        auto& depth = _dev_to_profiles[_depth_index];
+                        std::swap(rgb, depth);
+
+                        auto& res_rgb = _results[_rgb_index];
+                        auto& res_depth = _results[_depth_index];
+                        std::swap(res_rgb, res_depth);
+
+                        _depth_and_rgb = true;
+                    }
+
+
+                }
 
                 void open()
                 {
-                    for (auto && kvp : _dev_to_profiles) {
+                    for (auto&& kvp : _dev_to_profiles) {
                         auto&& sub = _results.at(kvp.first);
                         sub->open(kvp.second);
+                        if (_depth_and_rgb && kvp.first == _rgb_index)
+                        {
+                            // add delay after triggering RGB stream
+                            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                            std::cout << "NOHA :: multistream:::open :: added 1000ms sleep !" << std::endl;
+                        }
                     }
                 }
 
@@ -175,6 +209,9 @@ namespace librealsense
                 std::map<index_type, sensor_interface*> _devices;
                 std::map<int, sensor_interface*> _results;
                 std::map<int, stream_profiles> _dev_to_profiles;
+                boolean _depth_and_rgb;
+                int _rgb_index;
+                int _depth_index;
             };
 
             config() : require_all(true) {}
