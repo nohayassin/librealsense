@@ -144,7 +144,7 @@ namespace librealsense
                         }
                     }
 
-                    if (_rgb_index > -1 && _depth_index > -1)
+                    if (_rgb_index >= 0 && _depth_index >= 0)
                     {
                         // swap 
                         auto& rgb = _dev_to_profiles[_rgb_index];
