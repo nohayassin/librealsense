@@ -147,7 +147,7 @@ namespace librealsense
                     // swap if both rgb and depth streams are active and depth comes before rgb stream
                     if (_rgb_index >= 0 && _depth_index >= 0 && _rgb_index > _depth_index)
                     {
-                        // swap 
+                        // swap
                         auto& rgb = _dev_to_profiles[_rgb_index];
                         auto& depth = _dev_to_profiles[_depth_index];
                         std::swap(rgb, depth);
@@ -210,7 +210,7 @@ namespace librealsense
                 std::map<index_type, sensor_interface*> _devices;
                 std::map<int, sensor_interface*> _results;
                 std::map<int, stream_profiles> _dev_to_profiles;
-                boolean _depth_and_rgb;
+                bool _depth_and_rgb;
                 int _rgb_index;
                 int _depth_index;
             };
