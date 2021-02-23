@@ -143,8 +143,9 @@ namespace librealsense
                             if (val->get_stream_type() == RS2_STREAM_DEPTH) _depth_index = kvp.first;
                         }
                     }
-
-                    if (_rgb_index >= 0 && _depth_index >= 0)
+                    // RGB stream should come before depth stream
+                    // swap if both rgb and depth streams are active and depth comes before rgb stream
+                    if (_rgb_index >= 0 && _depth_index >= 0 && _rgb_index > _depth_index)
                     {
                         // swap 
                         auto& rgb = _dev_to_profiles[_rgb_index];
@@ -155,10 +156,10 @@ namespace librealsense
                         auto& res_depth = _results[_depth_index];
                         std::swap(res_rgb, res_depth);
 
+                        // update rgb and depth index
+                        std::swap(_rgb_index, _depth_index);
                         _depth_and_rgb = true;
                     }
-
-
                 }
 
                 void open()
