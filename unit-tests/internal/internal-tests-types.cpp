@@ -22,10 +22,10 @@ TEST_CASE("copy_array", "[code]")
     float src_float[]   = { 1.1f, 2.2f, 3.3f, -5.5f, 0.f, 123534.f };
     double src_double[] = { 0.00000000000000000001, -2222222222222222222222222.222222, 334529087543.30875246784, -5.51234533524532345254645234256, 5888985940.4535, -0.0000000000001 };
 
-    const size_t src_size = 6;// arr_size(src_float);
+    const size_t src_size = arr_size(src_float);
 
-    float       tgt_float[src_size]     = { 0 };
-    double      tgt_double[src_size]    = { 0 };
+    float       tgt_float[] = { 0, 0, 0, 0 ,0, 0 };
+    double      tgt_double[] = { 0, 0, 0, 0 ,0, 0 };
 
     // Check that precision is preserved when using identical or a larger data type
     elem = librealsense::copy_array(tgt_float, src_float);
