@@ -19,7 +19,7 @@
 using namespace librealsense;
 using namespace librealsense::platform;
 
-constexpr int ITERATIONS_PER_CONFIG = 20;
+constexpr int ITERATIONS_PER_CONFIG = 30;
 constexpr int INNER_ITERATIONS_PER_CONFIG = 10;
 constexpr int DELAY_INCREMENT_THRESHOLD = 3; //[%]
 constexpr int DELAY_INCREMENT_THRESHOLD_IMU = 8; //[%]
@@ -230,8 +230,9 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                 std::cout << "Sensor Test is running .." << std::endl;
             }
 
-            for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
+            for (auto iter = 0; iter < ITERATIONS_PER_CONFIG; iter++)
             {
+                std::cout << "NOHA ========================== iteration "<< iter << "=========================="<<std::endl;
                 rs2::config cfg;
                 rs2::pipeline pipe;
                 size_t cfg_size = 0;
@@ -296,11 +297,11 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                             auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
 
                             frame_number[stream_type].push_back(frame_num);
-                            //streams_delay[stream_type].push_back(time_of_arrival - start_time_milli);
                             streams_delay[stream_type].push_back(stream_type_frame_number_delay[stream_type][frame_num]);
                             int n = streams_delay[stream_type].size();
                             auto diff2 = stream_type_frame_number_delay[stream_type][frame_num];
-                            std::cout << "NOHA :: i = " << i << " - " << stream_type << " - frame_num = "<< frame_num  <<" - delay = " << streams_delay[stream_type][n - 1] << " - diff = "<< diff2 <<" - diff2 = " << diff2<< std::endl;
+                            //std::cout << "NOHA :: iteration = " << iter << " - " << stream_type << " - frame_num = "<< frame_num  <<" - delay = " << streams_delay[stream_type][n - 1] << " - diff = "<< diff2 <<" - diff2 = " << diff2<< std::endl;
+                            std::cout << "NOHA :: iteration = " << iter << " - " << stream_type << " - frame_num = " << frame_num << " - delay = " << streams_delay[stream_type][n - 1] << std::endl;
                             new_frame[stream_type] = true;
                         }
                         new_frame[stream_type] += 1;
@@ -311,8 +312,6 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                     std::lock_guard<std::mutex> lock(mutex);
                     auto now = std::chrono::system_clock::now();
                     auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
-                    //if(f==NULL) std::cout << "NOHA :: frame_callback :: NULL " << std::endl;
-
                     //std::cout << "NOHA :: frame_callback :: diff = "<< diff << std::endl;
                     if (rs2::frameset fs = f.as<rs2::frameset>())
                     {
@@ -328,8 +327,6 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                         auto stream_type = f.get_profile().stream_name();
                         auto frame_num = f.get_frame_number();
                         auto delay_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL) - start_time_milli; //time_of_arrival - start_time_milli
-                        // if ( m.find("f") == m.end() ) // key not found
-                        //if(stream_type_frame_number_delay[stream_type][frame_num])
                         bool cond1 = stream_type_frame_number_delay.find(stream_type) == stream_type_frame_number_delay.end();
                         bool cond2 = stream_type_frame_number_delay[stream_type].find(frame_num) == stream_type_frame_number_delay[stream_type].end();
                         if (cond1 || cond2)
@@ -348,7 +345,6 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                     rs2::pipeline_profile profiles = pipe.start(cfg, frame_callback);
                 }
                 else {
-
                     int jj = 0;
                     cfg_size = sensor_stream_profiles[jj].size();
                     for (auto& s : res.first)
@@ -357,51 +353,17 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                         if (jj == 0)
                         {
                             if (sensor_stream_profiles.find(jj) == sensor_stream_profiles.end()) continue;
-
-                            //start_time_map[current_sensor] = std::chrono::system_clock::now().time_since_epoch();
-
                             s.open(sensor_stream_profiles[jj]);
-
-                            //auto now = std::chrono::system_clock::now();
-                            //auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
-                            //std::cout << "NOHA :: i = "<< i << " - OPEN diff = " << diff << std::endl;
-                            //t1 = std::chrono::system_clock::now();
-
                             if (sensor_stream_profiles.find(jj) == sensor_stream_profiles.end()) continue;
-
                             t1 = std::chrono::system_clock::now();
-                            //std::this_thread::sleep_for(std::chrono::milliseconds(3000));
                             s.start(frame_callback);
                         }
                         jj += 1;
                     }
                 }
                 // to prevent FW issue, at least 20 frames per stream should arrive
-                while (!condition) // the condition is set to true when at least 20 frames are received per stream
-                {
-                    try
-                    {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(600));
-                        condition = true;
-                        /*if (new_frame.size() == cfg_size)
-                        {
-                            condition = true;
-                            for (auto it = new_frame.begin(); it != new_frame.end(); it++)
-                            {
-                                if (it->second < INNER_ITERATIONS_PER_CONFIG)
-                                {
-                                    condition = false;
-                                    break;
-                                }
-                            }
-                            // all streams received more than 10 frames
-                        }*/
-                    }
-                    catch (...)
-                    {
-                        std::cout << "Iteration failed  " << std::endl;
-                    }
-                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
                 if (is_pipe)
                 {
                     pipe.stop();
@@ -419,19 +381,9 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                             s.close();
                         }
                         ii += 1;
-                       
                     }
-                    /*ii = 0;
-                    for (auto& s : res.first)
-                    {
-                        if (ii != 0) continue; // check only 1 sensor
-                        //std::cout << "NOHA :: close sensor!"<<std::endl;
-                        //s.close();  //if (ii == 1) s.close();
-                        ii += 1;
-                    }*/
                 }
                 extrinsics_table_size.push_back(b._extrinsics.size());
-
             }
             std::cout << "Analyzing info ..  " << std::endl;
 
