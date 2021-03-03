@@ -23,7 +23,8 @@ namespace librealsense
     {
     public:
         virtual std::shared_ptr<sensor_interface> get_sensor() const = 0;
-        virtual void set_sensor(std::shared_ptr<sensor_interface> s) = 0;
+        virtual void set_sensor(std::shared_ptr<sensor_interface> s) = 0; 
+        virtual void set_sensor(std::weak_ptr<sensor_interface> s) = 0; // NOHA :: edited to weak ptr
         virtual ~sensor_part() = default;
     };
 
@@ -65,6 +66,10 @@ namespace librealsense
     class stream_profile_interface : public stream_interface, public recordable<stream_profile_interface>
     {
     public:
+        virtual ~stream_profile_interface() {
+            //std::cout << "NOHA ::  ~stream_profile_interface() " << std::endl;
+        }
+
         virtual rs2_format get_format() const = 0;
         virtual void set_format(rs2_format format) = 0;
 

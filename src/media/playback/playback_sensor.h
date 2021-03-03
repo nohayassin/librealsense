@@ -105,11 +105,11 @@ namespace librealsense
             }
             if (m_is_started)
             {
-                frame->get_owner()->set_sensor(shared_from_this());
+                frame->get_owner()->set_sensor(weak_from_this()); //NOHA::convert shared_from_this() to weak_from_this()
                 auto type = frame->get_stream()->get_stream_type();
                 auto index = static_cast<uint32_t>(frame->get_stream()->get_stream_index());
                 frame->set_stream(m_streams[std::make_pair(type, index)]);
-                frame->set_sensor(shared_from_this());
+                frame->set_sensor(weak_from_this()); //NOHA::convert shared_from_this() to weak_from_this()
                 auto stream_id = frame.frame->get_stream()->get_unique_id();
                 //TODO: Ziv, remove usage of shared_ptr when frame_holder is cpoyable
                 auto pf = std::make_shared<frame_holder>(std::move(frame));

@@ -647,10 +647,14 @@ namespace librealsense
         class multi_pins_uvc_device : public uvc_device
         {
         public:
+           // explicit multi_pins_uvc_device(const std::vector<std::shared_ptr<uvc_device>>& dev)
+            //    : _dev(dev)
+            //{}
             explicit multi_pins_uvc_device(const std::vector<std::shared_ptr<uvc_device>>& dev)
                 : _dev(dev)
-            {}
-
+            {
+                //_dev = dev;
+            }
             void probe_and_commit(stream_profile profile, frame_callback callback, int buffers) override
             {
                 auto dev_index = get_dev_index_by_profiles(profile);
@@ -804,7 +808,7 @@ namespace librealsense
                 throw std::runtime_error("profile not found");
             }
 
-            std::vector<std::shared_ptr<uvc_device>> _dev;
+            std::vector<std::shared_ptr<uvc_device>> _dev; // NOHA :: convert to weak
             std::set<uint32_t> _configured_indexes;
         };
 

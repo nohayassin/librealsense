@@ -795,6 +795,7 @@ namespace librealsense
 
         wmf_uvc_device::~wmf_uvc_device()
         {
+            std::cout << "NOHA :: ~wmf_uvc_device()" << std::endl;
             try {
                 if (_streaming)
                 {

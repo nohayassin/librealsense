@@ -38,6 +38,7 @@ namespace librealsense
         return profiles;
     })
     {
+        std::cout << "NOHA :: sensor_base()"<<std::endl;
         register_option(RS2_OPTION_FRAMES_QUEUE_SIZE, _source.get_published_size_option());
 
         register_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL, std::make_shared<librealsense::md_time_of_arrival_parser>());
@@ -284,6 +285,7 @@ namespace librealsense
 
     uvc_sensor::~uvc_sensor()
     {
+        std::cout << "NOHA :: ~uvc_sensor()"<<std::endl;
         try
         {
             if (_is_streaming)
@@ -309,7 +311,7 @@ namespace librealsense
         auto on = std::unique_ptr<power>(new power(std::dynamic_pointer_cast<uvc_sensor>(shared_from_this())));
 
         _source.init(_metadata_parsers);
-        _source.set_sensor(_source_owner->shared_from_this());
+        _source.set_sensor(_source_owner->weak_from_this()); // NOHA :: edited shared_from_this to weak_from_this
 
         std::vector<platform::stream_profile> commited;
 
@@ -320,9 +322,20 @@ namespace librealsense
             {
                 unsigned long long last_frame_number = 0;
                 rs2_time_t last_timestamp = 0;
+                // add sleep 
+                //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                bool is_first_frame = true;
                 _device->probe_and_commit(req_profile_base->get_backend_profile(),
-                    [this, req_profile_base, req_profile, last_frame_number, last_timestamp](platform::stream_profile p, platform::frame_object f, std::function<void()> continuation) mutable
+                    [this, req_profile_base, req_profile, last_frame_number, last_timestamp, is_first_frame](platform::stream_profile p, platform::frame_object f, std::function<void()> continuation) mutable
                 {
+                        frame_interface* fhh;
+                        //_source.invoke_callback(std::move(fhh));
+                        //auto owner = frame->get_owner();
+                        //auto callback = f.get_owner()->begin_callback();
+                        //return;
+                        //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                        auto t1 = std::chrono::system_clock::now();
+
                     const auto&& system_time = environment::get_instance().get_time_service()->get_time();
                     const auto&& fr = generate_frame_from_data(f, _timestamp_reader.get(), last_timestamp, last_frame_number, req_profile_base);
                     const auto&& requires_processing = true; // TODO - Ariel add option
@@ -333,23 +346,23 @@ namespace librealsense
 
                     if (!this->is_streaming())
                     {
-                        LOG_WARNING("Frame received with streaming inactive,"
+                        /*LOG_WARNING("Frame received with streaming inactive,"
                             << librealsense::get_string(req_profile_base->get_stream_type())
                             << req_profile_base->get_stream_index()
-                            << ", Arrived," << std::fixed << f.backend_time << " " << system_time);
+                            << ", Arrived," << std::fixed << f.backend_time << " " << system_time);*/
                         return;
                     }
 
                     frame_continuation release_and_enqueue(continuation, f.pixels);
 
-                    LOG_DEBUG("FrameAccepted," << librealsense::get_string(req_profile_base->get_stream_type())
+                    /*LOG_DEBUG("FrameAccepted," << librealsense::get_string(req_profile_base->get_stream_type())
                         << ",Counter," << std::dec << fr->additional_data.frame_number
                         << ",Index," << req_profile_base->get_stream_index()
                         << ",BackEndTS," << std::fixed << f.backend_time
                         << ",SystemTime," << std::fixed << system_time
                         << " ,diff_ts[Sys-BE]," << system_time - f.backend_time
                         << ",TS," << std::fixed << timestamp << ",TS_Domain," << rs2_timestamp_domain_to_string(timestamp_domain)
-                        << ",last_frame_number," << last_frame_number << ",last_timestamp," << last_timestamp);
+                        << ",last_frame_number," << last_frame_number << ",last_timestamp," << last_timestamp);*/
 
                     last_frame_number = frame_counter;
                     last_timestamp = timestamp;
@@ -360,8 +373,8 @@ namespace librealsense
 
                     frame_holder fh = _source.alloc_frame(stream_to_frame_types(req_profile_base->get_stream_type()), width * height * bpp / 8, fr->additional_data, requires_processing);
                     auto diff = environment::get_instance().get_time_service()->get_time() - system_time;
-                    if (diff >10 )
-                        LOG_DEBUG("!! Frame allocation took " << diff << " msec");
+                    /*if (diff >10 )
+                        LOG_DEBUG("!! Frame allocation took " << diff << " msec");*/
 
                     if (fh.frame)
                     {
@@ -373,13 +386,13 @@ namespace librealsense
                     }
                     else
                     {
-                        LOG_INFO("Dropped frame. alloc_frame(...) returned nullptr");
+                        //LOG_INFO("Dropped frame. alloc_frame(...) returned nullptr");
                         return;
                     }
 
                     diff = environment::get_instance().get_time_service()->get_time() - system_time;
-                    if (diff >10 )
-                        LOG_DEBUG("!! Frame memcpy took " << diff << " msec");
+                   /* if (diff >10 )
+                        LOG_DEBUG("!! Frame memcpy took " << diff << " msec");*/
                     if (!requires_processing)
                     {
                         fh->attach_continuation(std::move(release_and_enqueue));
@@ -387,7 +400,17 @@ namespace librealsense
 
                     if (fh->get_stream().get())
                     {
+                        
+                        //if (!is_first_frame) return;
+                        is_first_frame = false;
                         _source.invoke_callback(std::move(fh));
+                        //if (_source.get_first_frame_flag()) _source.set_first_frame_flag(false);
+                        //_source.set_first_frame_flag(fa);
+                        auto now = std::chrono::system_clock::now();
+                        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+                        //std::cout << "NOHA :: _source.invoke_callback = " << diff << std::endl;
+                        //std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+                        //_source.stop_callback(std::move(fh));
                     }
                 });
             }
@@ -497,6 +520,7 @@ namespace librealsense
         _is_streaming = false;
         _device->stop_callbacks();
         raise_on_before_streaming_changes(false);
+        reset_streaming();
     }
 
     void uvc_sensor::reset_streaming()
@@ -943,6 +967,7 @@ namespace librealsense
         _user_count(0),
         _timestamp_reader(std::move(timestamp_reader))
     {
+        std::cout << "NOHA :: uvc_sensor()" << std::endl;
         register_metadata(RS2_FRAME_METADATA_BACKEND_TIMESTAMP, make_additional_data_parser(&frame_additional_data::backend_timestamp));
         register_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE, make_additional_data_parser(&frame_additional_data::raw_size));
     }
@@ -1037,6 +1062,7 @@ namespace librealsense
         const std::map<uint32_t, rs2_stream>& fourcc_to_rs2_stream_map)
         : sensor_base(name, device, (recommended_proccesing_blocks_interface*)this), _raw_sensor(std::move(sensor))
     {
+        std::cout << "NOHA :: synthetic_sensor()"<<std::endl;
         // synthetic sensor and its raw sensor will share the formats and streams mapping
         auto& raw_fourcc_to_rs2_format_map = _raw_sensor->get_fourcc_to_rs2_format_map();
         _fourcc_to_rs2_format = std::make_shared<std::map<uint32_t, rs2_format>>(fourcc_to_rs2_format_map);
@@ -1049,6 +1075,7 @@ namespace librealsense
 
     synthetic_sensor::~synthetic_sensor()
     {
+        std::cout << "NOHA :: ~synthetic_sensor()" << std::endl;
         try
         {
             if (is_streaming())
@@ -1150,7 +1177,7 @@ namespace librealsense
         });
     }
 
-    std::shared_ptr<stream_profile_interface> synthetic_sensor::clone_profile(const std::shared_ptr<stream_profile_interface>& profile)
+    std::shared_ptr<stream_profile_interface> synthetic_sensor::clone_profile(const std::shared_ptr<stream_profile_interface>& profile) // NOHA :: convert to weak_ptr
     {
         auto cloned = std::make_shared<stream_profile_base>(platform::stream_profile{});
 
@@ -1172,6 +1199,8 @@ namespace librealsense
         cloned->set_stream_type(profile->get_stream_type());
         cloned->set_framerate(profile->get_framerate());
 
+        //std::weak_ptr<stream_profile_base> cloned_weak(cloned);
+        //return cloned_weak;
         return cloned;
     }
 
@@ -1207,6 +1236,7 @@ namespace librealsense
                 _cached_processing_blocks_options.erase(cached_opt);
             }
         }
+
     }
 
     bool synthetic_sensor::is_duplicated_profile(const std::shared_ptr<stream_profile_interface>& duplicate, const stream_profiles& profiles)
@@ -1240,7 +1270,7 @@ namespace librealsense
                         for (auto target : targets)
                         {
                             target.fps = profile->get_framerate();
-
+                            
                             auto&& cloned_profile = clone_profile(profile);
                             cloned_profile->set_format(target.format);
                             cloned_profile->set_stream_index(target.index);
@@ -1459,6 +1489,8 @@ namespace librealsense
         _cached_requests.erase(_cached_requests.begin(), _cached_requests.end());
         set_active_streams({});
         _post_process_callback.reset();
+        //_target_to_source_profiles_map;//.erase(_cached_requests.begin(), _cached_requests.end());
+        _source_to_target_profiles_map.clear();
     }
 
     template<class T>

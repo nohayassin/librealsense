@@ -24,8 +24,8 @@ namespace librealsense
 
         std::weak_ptr<sensor_interface> _sensor;
         std::shared_ptr<sensor_interface> get_sensor() const override { return _sensor.lock(); }
-        void set_sensor(std::shared_ptr<sensor_interface> s) override { _sensor = s; }
-
+        void set_sensor(std::shared_ptr<sensor_interface> s) override { _sensor = s; } 
+        void set_sensor(std::weak_ptr<sensor_interface> s) override  { _sensor = s.lock(); } // NOHA :: edited to weak ptr
         T alloc_frame(const size_t size, const frame_additional_data& additional_data, bool requires_memory)
         {
             T backbuffer;
@@ -179,6 +179,7 @@ namespace librealsense
 
         void release_frame_ref(frame_interface* ref)
         {
+            std::cout << "NOHA :: frame-archive :: release_frame_ref " << std::endl;
             ref->release();
         }
 
@@ -190,6 +191,7 @@ namespace librealsense
 
         void flush() override
         {
+            //std::cout <<"NOHA :: frame-archive :: flush " << std::endl;
             published_frames.stop_allocation();
             callback_inflight.stop_allocation();
             recycle_frames = false;

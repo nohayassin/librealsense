@@ -32,6 +32,7 @@ namespace librealsense
         frame_callback_ptr get_callback() const;
 
         void invoke_callback(frame_holder frame) const;
+        void stop_callback(frame_holder frame);
 
         void flush() const;
 
@@ -39,7 +40,7 @@ namespace librealsense
 
         double get_time() const { return _ts ? _ts->get_time() : 0; }
 
-        void set_sensor(const std::shared_ptr<sensor_interface>& s);
+        void set_sensor(const std::weak_ptr<sensor_interface>& s);
 
         template<class T>
         void add_extension(rs2_extension ex)
@@ -48,7 +49,8 @@ namespace librealsense
         }
 
         void set_max_publish_list_size(int qsize) {_max_publish_list_size = qsize; }
-
+       // void set_first_frame_flag(bool val) { _is_first_frame = val; }
+        //bool get_first_frame_flag() { return _is_first_frame; }
     private:
         friend class syncer_process_unit;
 
@@ -60,5 +62,6 @@ namespace librealsense
         frame_callback_ptr _callback;
         std::shared_ptr<platform::time_service> _ts;
         std::shared_ptr<metadata_parser_map> _metadata_parsers;
+        //std::atomic_bool _is_first_frame;
     };
 }

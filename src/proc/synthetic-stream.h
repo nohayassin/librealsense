@@ -55,7 +55,10 @@ namespace librealsense
         void invoke(frame_holder frames) override;
         synthetic_source_interface& get_source() override { return _source_wrapper; }
 
-        virtual ~processing_block() { _source.flush(); }
+        virtual ~processing_block() { 
+            //std::cout << "NOHA ::  ~processing_block() "<<std::endl;
+            _source.flush(); 
+        }
     protected:
         frame_source _source;
         std::mutex _mutex;

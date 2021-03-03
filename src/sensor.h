@@ -48,7 +48,11 @@ namespace librealsense
         explicit sensor_base(std::string name,
                              device* device, 
                              recommended_proccesing_blocks_interface* owner);
-        virtual ~sensor_base() override { _source.flush(); }
+        virtual ~sensor_base() override 
+        {
+            std::cout << "NOHA :: ~sensor_base()" <<std::endl;
+            _source.flush(); 
+        }
 
         void set_source_owner(sensor_base* owner); // will direct the source to the top in the source hierarchy.
         virtual stream_profiles init_stream_profiles() = 0;
@@ -235,7 +239,7 @@ namespace librealsense
         std::pair<std::shared_ptr<processing_block_factory>, stream_profiles> find_requests_best_pb_match(const stream_profiles& sp);
         void add_source_profile_missing_data(std::shared_ptr<stream_profile_interface>& source_profile);
         bool is_duplicated_profile(const std::shared_ptr<stream_profile_interface>& duplicate, const stream_profiles& profiles);
-        std::shared_ptr<stream_profile_interface> clone_profile(const std::shared_ptr<stream_profile_interface>& profile);
+        std::shared_ptr<stream_profile_interface> clone_profile(const std::shared_ptr<stream_profile_interface>& profile); // NOHA :: convert to weak_ptr
         void register_processing_block_options(const processing_block& pb);
         void unregister_processing_block_options(const processing_block& pb);
 
@@ -335,7 +339,7 @@ namespace librealsense
         void register_pu(rs2_option id);
 
         std::vector<platform::stream_profile> get_configuration() const { return _internal_config; }
-        std::shared_ptr<platform::uvc_device> get_uvc_device() { return _device; }
+        std::shared_ptr<platform::uvc_device> get_uvc_device() { return _device; } // NOHA :: converted to weak ptr
         platform::usb_spec get_usb_specification() const { return _device->get_usb_specification(); }
         std::string get_device_path() const { return _device->get_device_location(); }
 
@@ -383,7 +387,7 @@ namespace librealsense
             std::weak_ptr<uvc_sensor> _owner;
         };
 
-        std::shared_ptr<platform::uvc_device> _device;
+        std::shared_ptr<platform::uvc_device> _device; // NOHA :: convert to weak ptr
         std::atomic<int> _user_count;
         std::mutex _power_lock;
         std::mutex _configure_lock;

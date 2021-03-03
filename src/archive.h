@@ -157,8 +157,8 @@ namespace librealsense
         archive_interface* get_owner() const override { return owner.get(); }
 
         std::shared_ptr<sensor_interface> get_sensor() const override;
-        void set_sensor(std::shared_ptr<sensor_interface> s) override;
-
+        void set_sensor(std::shared_ptr<sensor_interface> s) override; 
+        void set_sensor(std::weak_ptr<sensor_interface> s) ; // NOHA :: edited to weak ptr
 
         void log_callback_start(rs2_time_t timestamp) override;
         void log_callback_end(rs2_time_t timestamp) const override;

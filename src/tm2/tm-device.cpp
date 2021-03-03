@@ -1230,7 +1230,7 @@ namespace librealsense
             frame->set_timestamp(ts.global_ts.count());
             frame->set_timestamp_domain(RS2_TIMESTAMP_DOMAIN_GLOBAL_TIME);
             frame->set_stream(profile);
-            frame->set_sensor(this->shared_from_this()); //TODO? uvc doesn't set it?
+            frame->set_sensor(this->weak_from_this()); //TODO? uvc doesn't set it? // NOHA :: convert shared_from_this() to weak_from_this()
             video->data.assign(message->metadata.bFrameData, message->metadata.bFrameData + (height * stride));
         }
         else

@@ -21,8 +21,8 @@ namespace librealsense
         }
         return res;
     }
-    void frame::set_sensor(std::shared_ptr<sensor_interface> s) { sensor = s; }
-
+    void frame::set_sensor(std::shared_ptr<sensor_interface> s) { sensor = s; }  
+    void frame::set_sensor(std::weak_ptr<sensor_interface> s) { sensor = s; }  // NOHA :: edited to weak ptr
     float3* points::get_vertices()
     {
         get_frame_data(); // call GetData to ensure data is in main memory

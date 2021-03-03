@@ -65,6 +65,7 @@ namespace librealsense
         }
 
         _metadata_parsers = metadata_parsers;
+        //_is_first_frame = true;
     }
 
     callback_invocation_holder frame_source::begin_callback()
@@ -91,7 +92,7 @@ namespace librealsense
         return it->second->alloc_and_track(size, additional_data, requires_memory);
     }
 
-    void frame_source::set_sensor(const std::shared_ptr<sensor_interface>& s)
+    void frame_source::set_sensor(const std::weak_ptr<sensor_interface>& s) // NOHA :: edited to weak ptr
     {
         for (auto&& a : _archive)
         {
@@ -114,7 +115,11 @@ namespace librealsense
     {
         if (frame)
         {
+            auto t1 = std::chrono::system_clock::now();
+
+            auto owner = frame.frame->get_owner();
             auto callback = frame.frame->get_owner()->begin_callback();
+
             try
             {
                 frame->log_callback_start(_ts ? _ts->get_time() : 0);
@@ -122,7 +127,10 @@ namespace librealsense
                 {
                     frame_interface* ref = nullptr;
                     std::swap(frame.frame, ref);
-                    _callback->on_frame((rs2_frame*)ref);
+                    //if (_is_first_frame)
+                    //{
+                        _callback->on_frame((rs2_frame*)ref);
+                    //}
                 }
             }
             catch( const std::exception & e )
@@ -133,9 +141,16 @@ namespace librealsense
             {
                 LOG_ERROR("Exception was thrown during user callback!");
             }
+
+            auto now = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+            //std::cout << "NOHA :: invoke_callback:: DIFF = " << diff << std::endl;
         }
     }
-
+    void frame_source::stop_callback(frame_holder frame)
+    {
+        frame.frame->get_owner()->flush();
+    }
     void frame_source::flush() const
     {
         for (auto&& kvp : _archive)

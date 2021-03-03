@@ -184,9 +184,15 @@ namespace rs2
         template<class T>
         void start(T callback) const
         {
+            auto t1 = std::chrono::system_clock::now();
+
             rs2_error* e = nullptr;
             rs2_start_cpp(_sensor.get(), new frame_callback<T>(std::move(callback)), &e);
             error::handle(e);
+
+            auto now = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+            std::cout << "NOHA :: sensor start DIFF = "<< diff << std::endl;
         }
 
         /**
@@ -320,6 +326,11 @@ namespace rs2
         const std::shared_ptr<rs2_sensor>& get() const
         {
             return _sensor;
+        }
+
+        void flush() 
+        {
+            _sensor.reset();
         }
 
         template<class T>
