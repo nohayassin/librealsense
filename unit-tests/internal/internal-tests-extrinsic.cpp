@@ -289,23 +289,23 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                     auto frame_num = f.get_frame_number();
                     auto time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
 
-                    if (std::find(frame_number[stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end())
-                    {
+                    //if (std::find(frame_number[i][stream_type].begin(), frame_number[stream_type].end(), frame_num) == frame_number[stream_type].end())
+                    //{
                         if (!new_frame[stream_type])
                         {
                             auto now = std::chrono::system_clock::now();
                             auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
 
                             frame_number[stream_type].push_back(frame_num);
-                            streams_delay[stream_type].push_back(stream_type_frame_number_delay[stream_type][frame_num]);
-                            int n = streams_delay[stream_type].size();
-                            auto diff2 = stream_type_frame_number_delay[stream_type][frame_num];
+                            streams_delay[stream_type].push_back(diff);
+                            //int n = streams_delay[stream_type].size();
+                            //auto diff2 = stream_type_frame_number_delay[stream_type][frame_num];
                             //std::cout << "NOHA :: iteration = " << iter << " - " << stream_type << " - frame_num = "<< frame_num  <<" - delay = " << streams_delay[stream_type][n - 1] << " - diff = "<< diff2 <<" - diff2 = " << diff2<< std::endl;
-                            std::cout << "NOHA :: iteration = " << iter << " - " << stream_type << " - frame_num = " << frame_num << " - delay = " << streams_delay[stream_type][n - 1] << std::endl;
+                            std::cout << "NOHA :: iteration = " << iter << " - " << stream_type << " - frame_num = " << frame_num << " - time_of_arrival = " << time_of_arrival << " - delay = " << diff << std::endl;
                             new_frame[stream_type] = true;
                         }
                         new_frame[stream_type] += 1;
-                    }
+                    //}
                 };
                 auto frame_callback = [&](const rs2::frame& f)
                 {
@@ -332,7 +332,7 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                         if (cond1 || cond2)
                         {
                             stream_type_frame_number_delay[stream_type][frame_num] = delay_of_arrival;
-                            std::cout << "NOHA :: frame_callback :: single frame :: frame_num = " << frame_num << " - start_time_milli = " << start_time_milli << " - delay_of_arrival = " << delay_of_arrival << std::endl;
+                            //std::cout << "NOHA :: frame_callback :: single frame :: frame_num = " << frame_num << " - start_time_milli = " << start_time_milli << " - delay_of_arrival = " << delay_of_arrival << std::endl;
                         }
 
                         // Stream that bypass synchronization (such as IMU) will produce single frames
@@ -341,7 +341,7 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
                 };
                 if (is_pipe)
                 {
-                    t1 = std::chrono::system_clock::now();
+                    //t1 = std::chrono::system_clock::now();
                     rs2::pipeline_profile profiles = pipe.start(cfg, frame_callback);
                 }
                 else {

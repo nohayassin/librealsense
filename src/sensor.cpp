@@ -487,7 +487,8 @@ namespace librealsense
         {
             As<librealsense::global_time_interface>(_owner)->enable_time_diff_keeper(false);
         }
-        //_power.reset();
+        _power.reset();
+        //_power.release();
         _is_opened = false;
         set_active_streams({});
     }
