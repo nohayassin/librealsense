@@ -17,6 +17,9 @@ namespace librealsense
             std::lock_guard<std::mutex> lock(_mtx);
             _resolved_profile.reset();
             _stream_requests[{stream, index}] = { format, stream, index, width, height, fps };
+            // NOHA :: check if enabled stream is in _streams_to_disable vector and remove it if still there
+                auto position = std::find(_streams_to_disable.begin(), _streams_to_disable.end(), stream);
+                if (position != _streams_to_disable.end()) _streams_to_disable.erase(position); //means the element was  found
         }
 
         void config::enable_all_stream()
@@ -26,6 +29,7 @@ namespace librealsense
             _stream_requests.clear();
             _enable_all_streams = true;
             _disable_all_streams = false;
+            _streams_to_disable.clear();
         }
 
         void config::enable_device(const std::string& serial)
@@ -95,6 +99,7 @@ namespace librealsense
             _enable_all_streams = false;
             _disable_all_streams = true;
             _resolved_profile.reset();
+            _streams_to_disable.clear();
         }
         void config::enable_only_selected_profiles(util::config &config, const stream_profiles& profiles)
         {
