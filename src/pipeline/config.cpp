@@ -96,7 +96,7 @@ namespace librealsense
             _disable_all_streams = true;
             _resolved_profile.reset();
         }
-        void config::enable_only_selected_profiles(util::config &config, stream_profiles profiles)
+        void config::enable_only_selected_profiles(util::config &config, const stream_profiles& profiles)
         {
             if (!_streams_to_disable.empty())
             {
@@ -177,6 +177,7 @@ namespace librealsense
                 //    }
                 //}
                 return std::make_shared<profile>(dev, config, _device_request.record_output);
+
             }
 
             //Enabled requested streams
