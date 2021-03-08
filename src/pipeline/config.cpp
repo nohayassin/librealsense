@@ -70,11 +70,11 @@ namespace librealsense
 
         void config::disable_stream(rs2_stream stream, int index)
         {
-            if (_enable_all_streams)
-            {
+            //if (_enable_all_streams)
+            //{
                 _streams_to_disable.push_back(stream);
-                return;
-            }
+                //return;
+            //}
             std::lock_guard<std::mutex> lock(_mtx);
             auto itr = std::begin(_stream_requests);
             while (itr != std::end(_stream_requests))
@@ -101,7 +101,7 @@ namespace librealsense
             _resolved_profile.reset();
             _streams_to_disable.clear();
         }
-        void config::enable_only_selected_profiles(util::config &config, const stream_profiles& profiles)
+        void config::enable_only_selected_profiles(util::config &config, stream_profiles& profiles)
         {
             if (!_streams_to_disable.empty())
             {
@@ -131,7 +131,7 @@ namespace librealsense
         std::shared_ptr<profile> config::resolve(std::shared_ptr<device_interface> dev)
         {
             util::config config;
-
+            //if(_disable_all_streams) return std::make_shared<profile>(dev, config, _device_request.record_output);
             //if the user requested all streams
             if (_enable_all_streams)
             {
@@ -144,7 +144,6 @@ namespace librealsense
                 }
                 return std::make_shared<profile>(dev, config, _device_request.record_output);
             }
-            //if (_disable_all_streams) return NULL;
             //If the user did not request anything, give it the default, on playback all recorded streams are marked as default.
             if (_stream_requests.empty())
             {
@@ -188,7 +187,17 @@ namespace librealsense
             //Enabled requested streams
             for (auto&& req : _stream_requests)
             {
+                bool disable_stream = false;
                 auto r = req.second;
+                for (auto& st : _streams_to_disable)
+                {
+                    if (st == r.stream)
+                    {
+                        disable_stream = true;
+                        break;
+                    }
+                }
+                if (disable_stream) continue;
                 config.enable_stream(r.stream, r.index, r.width, r.height, r.format, r.fps);
             }
             return std::make_shared<profile>(dev, config, _device_request.record_output);

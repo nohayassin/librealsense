@@ -55,7 +55,7 @@ namespace librealsense
             stream_profiles get_default_configuration(std::shared_ptr<device_interface> dev);
             std::shared_ptr<profile> resolve(std::shared_ptr<device_interface> dev);
             bool get_disable_all_streams() const { return _disable_all_streams; };
-            void enable_only_selected_profiles(util::config &config, const stream_profiles& profiles);
+            void enable_only_selected_profiles(util::config &config, stream_profiles& profiles);
             device_request _device_request;
             std::map<std::pair<rs2_stream, int>, stream_profile> _stream_requests;
             std::vector<rs2_stream> _streams_to_disable;
