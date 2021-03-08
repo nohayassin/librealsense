@@ -25,6 +25,7 @@ namespace librealsense
             _resolved_profile.reset();
             _stream_requests.clear();
             _enable_all_streams = true;
+            _disable_all_streams = false;
         }
 
         void config::enable_device(const std::string& serial)
@@ -65,6 +66,11 @@ namespace librealsense
 
         void config::disable_stream(rs2_stream stream, int index)
         {
+            if (_enable_all_streams)
+            {
+                _streams_to_disable.push_back(stream);
+                return;
+            }
             std::lock_guard<std::mutex> lock(_mtx);
             auto itr = std::begin(_stream_requests);
             while (itr != std::end(_stream_requests))
@@ -87,9 +93,36 @@ namespace librealsense
             std::lock_guard<std::mutex> lock(_mtx);
             _stream_requests.clear();
             _enable_all_streams = false;
+            _disable_all_streams = true;
             _resolved_profile.reset();
         }
-
+        void config::enable_only_selected_profiles(util::config &config, stream_profiles profiles)
+        {
+            if (!_streams_to_disable.empty())
+            {
+                for (auto prof : profiles)
+                {
+                    bool disable_stream = false;
+                    auto p = prof.get();
+                    auto vp = dynamic_cast<video_stream_profile*>(p);
+                    for (auto& st : _streams_to_disable)
+                    {
+                        if (st == p->get_stream_type())
+                        {
+                            disable_stream = true;
+                            break;
+                        }
+                    }
+                    if (disable_stream) continue;
+                    if (vp) config.enable_stream(vp->get_stream_type(), vp->get_stream_index(), vp->get_width(), vp->get_height(), vp->get_format(), vp->get_framerate());
+                    config.enable_stream(p->get_stream_type(), p->get_stream_index(), 0, 0, p->get_format(), p->get_framerate());
+                }
+            }
+            else
+            {
+                config.enable_streams(profiles);
+            }
+        }
         std::shared_ptr<profile> config::resolve(std::shared_ptr<device_interface> dev)
         {
             util::config config;
@@ -101,16 +134,48 @@ namespace librealsense
                 {
                     auto&& sub = dev->get_sensor(i);
                     auto profiles = sub.get_stream_profiles(PROFILE_TAG_SUPERSET);
-                    config.enable_streams(profiles);
+                    //config.enable_streams(profiles);
+                    enable_only_selected_profiles(config, profiles);
                 }
                 return std::make_shared<profile>(dev, config, _device_request.record_output);
             }
-
+            //if (_disable_all_streams) return NULL;
             //If the user did not request anything, give it the default, on playback all recorded streams are marked as default.
             if (_stream_requests.empty())
             {
                 auto default_profiles = get_default_configuration(dev);
-                config.enable_streams(default_profiles);
+                //config.enable_streams(default_profiles);
+                enable_only_selected_profiles(config, default_profiles);
+
+                // NOHA :: added (new)
+                //if (!_streams_to_disable.empty())
+                //{
+                //    for (auto prof : default_profiles)
+                //    {
+                //        bool disable_stream = false;
+                //        auto p = prof.get();
+                //        auto vp = dynamic_cast<video_stream_profile*>(p);
+                //        //if (vp)
+                //        //{
+                //            //enable_stream(vp->get_stream_type(), vp->get_stream_index(), vp->get_width(), vp->get_height(), vp->get_format(), vp->get_framerate());
+                //            //enable_stream(rs2_stream stream, int index, uint32_t width, uint32_t height, rs2_format format, uint32_t fps)
+                //            //_stream_requests[{vp->get_stream_type(), vp->get_stream_index()}] = { vp->get_format(), vp->get_stream_type(), vp->get_stream_index(), vp->get_width(), vp->get_height(), vp->get_framerate() };
+                //            //continue;
+                //        //}
+                //        //_stream_requests[{p->get_stream_type(), p->get_stream_index()}] = { p->get_format(), p->get_stream_type(), p->get_stream_index(), 0, 0, p->get_framerate() };
+                //        for (auto &st : _streams_to_disable)
+                //        {
+                //            if (st == p->get_stream_type())
+                //            {
+                //                disable_stream = true;
+                //                break;
+                //            }
+                //        }
+                //        if (disable_stream) continue;
+                //        if(vp) config.enable_stream(vp->get_stream_type(), vp->get_stream_index(), vp->get_width(), vp->get_height(), vp->get_format(), vp->get_framerate());
+                //        config.enable_stream(p->get_stream_type(), p->get_stream_index(), 0, 0, p->get_format(), p->get_framerate());
+                //    }
+                //}
                 return std::make_shared<profile>(dev, config, _device_request.record_output);
             }
 

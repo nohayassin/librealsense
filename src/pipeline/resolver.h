@@ -181,6 +181,7 @@ namespace librealsense
 
             void enable_streams(stream_profiles profiles)
             {
+                //auto val = get_disable_all_streams();
                 std::map<std::tuple<int, int>, std::vector<std::shared_ptr<stream_profile_interface>>> profiles_map;
 
                 for (auto profile : profiles)

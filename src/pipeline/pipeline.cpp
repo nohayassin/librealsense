@@ -80,7 +80,7 @@ namespace librealsense
                     }
                 }
             }
-
+            //if (!profile) return; // NOHA
             assert(profile);
             assert(profile->_multistream.get_profiles().size() > 0);
 

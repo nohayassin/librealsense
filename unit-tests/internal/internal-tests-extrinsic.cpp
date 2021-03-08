@@ -439,3 +439,137 @@ TEST_CASE("Extrinsic memory leak detection", "[live]")
         }
     }
 }
+TEST_CASE("Enable disable all streams", "[live]")
+{
+    // Require at least one device to be plugged in
+
+    rs2::context ctx;
+    if (make_context(SECTION_FROM_TEST_NAME, &ctx))
+    {
+        rs2::log_to_file(RS2_LOG_SEVERITY_DEBUG, "C:\\work\\LRS_Validation\\en_dis_streams.log");
+
+        std::cout << "Enable disable all streams started" << std::endl;
+
+        // Get device and a stream profile for each stream type it supports
+        rs2::pipeline pipe(ctx);
+        rs2::config cfg;
+        rs2::pipeline_profile pipe_profile;
+        cfg.enable_all_streams();
+        REQUIRE_NOTHROW(pipe_profile = cfg.resolve(pipe));
+
+        rs2::device dev = pipe_profile.get_device();
+        std::vector<rs2::stream_profile> streams = pipe_profile.get_streams();
+        cfg.disable_stream(RS2_STREAM_COLOR);
+        cfg.disable_stream(RS2_STREAM_DEPTH);
+
+        pipe_profile = cfg.resolve(pipe);
+        std::vector<rs2::stream_profile> streams2 = pipe_profile.get_streams();
+
+        std::mutex mutex;
+        auto process_frame = [&](const rs2::frame& f)
+        {
+            auto stream_type = f.get_profile().stream_name();
+            auto frame_num = f.get_frame_number();
+            auto time_of_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL);
+
+            std::cout <<"NOHA :: frame_num = "<< frame_num << " - " << stream_type << " - " << time_of_arrival  <<std::endl;
+
+        };
+        auto frame_callback = [&](const rs2::frame& f)
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (rs2::frameset fs = f.as<rs2::frameset>())
+            {
+                // With callbacks, all synchronized stream will arrive in a single frameset
+                for (const rs2::frame& ff : fs)
+                {
+                    process_frame(ff);
+                }
+            }
+            else
+            {
+                // Stream that bypass synchronization (such as IMU) will produce single frames
+                process_frame(f);
+            }
+        };
+
+        rs2::pipeline_profile profiles = pipe.start(cfg, frame_callback);
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        pipe.stop();
+    }
+}
+TEST_CASE("Enable disable all streams GITHUB", "[live]")
+{
+    // Require at least one device to be plugged in
+
+    rs2::context ctx;
+    if (make_context(SECTION_FROM_TEST_NAME, &ctx))
+    {
+        rs2::log_to_file(RS2_LOG_SEVERITY_DEBUG, "C:\\work\\LRS_Validation\\en_dis_streams.log");
+
+        std::cout << "Enable disable all streams GITHUB started" << std::endl;
+
+        std::map<int, int> counters;
+        std::map<int, std::string> stream_names;
+        std::mutex mutex;
+
+        // Define frame callback
+        // The callback is executed on a sensor thread and can be called simultaneously from multiple sensors
+        // Therefore any modification to common memory should be done under lock
+        auto callback = [&](const rs2::frame& frame)
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (rs2::frameset fs = frame.as<rs2::frameset>())
+            {
+                // With callbacks, all synchronized stream will arrive in a single frameset
+                for (const rs2::frame& f : fs)
+                    counters[f.get_profile().unique_id()]++;
+            }
+            else
+            {
+                // Stream that bypass synchronization (such as IMU) will produce single frames
+                counters[frame.get_profile().unique_id()]++;
+            }
+        };
+
+        // Declare RealSense pipeline, encapsulating the actual device and sensors.
+        rs2::pipeline pipe;
+
+        // CONFIG HERE:
+        rs2::config cfg;
+        cfg.enable_all_streams();
+        //cfg.enable_stream(RS2_STREAM_COLOR);
+        //cfg.disable_all_streams();   // <-- Instead of this call ...
+        cfg.disable_stream(RS2_STREAM_COLOR);   // we can also do this ...
+    //    cfg.disable_stream(RS2_STREAM_DEPTH);   // or this ...
+    //    cfg.disable_stream(RS2_STREAM_INFRARED);  // or this...
+        // .. or all of them, the effect is the same (no effect).
+
+        // Start streaming through the callback with default recommended configuration
+        // The default video configuration contains Depth and Color streams
+        // If a device is capable to stream IMU data, both Gyro and Accelerometer are enabled by default
+
+        rs2::pipeline_profile profiles = pipe.start(cfg, callback);
+
+        // Collect the enabled streams names
+        for (auto p : profiles.get_streams())
+            stream_names[p.unique_id()] = p.stream_name();
+
+        std::cout << "RealSense callback sample" << std::endl << std::endl;
+
+        while (true)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+
+            std::lock_guard<std::mutex> lock(mutex);
+
+            for (auto p : counters)
+            {
+                std::cout << stream_names[p.first] << "[" << p.first << "]: " << p.second << " [frames] || ";
+            }
+            std::cout << std::endl;
+        }
+
+    }
+}
