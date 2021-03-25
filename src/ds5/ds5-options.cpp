@@ -322,11 +322,20 @@ namespace librealsense
 
     ds::depth_table_control depth_scale_option::get_depth_table(ds::advanced_query_mode mode) const
     {
+        
+
         command cmd(ds::GET_ADV);
         cmd.param1 = ds::etDepthTableControl;
         cmd.param2 = mode;
+
+        auto t1 = std::chrono::system_clock::now();
+
         auto res = _hwm.send(cmd);
 
+        auto now = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+
+        std::cout <<"NOHA :: get_depth_table :: diff = "<< diff <<std::endl;
         if (res.size() < sizeof(ds::depth_table_control))
             throw std::runtime_error("Not enough bytes returned from the firmware!");
 

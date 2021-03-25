@@ -214,8 +214,15 @@ namespace librealsense
             return _uvc_sensor_base.invoke_powered([&]
                 (platform::uvc_device& dev)
                 {
+                    auto t1 = std::chrono::system_clock::now();
                     std::lock_guard<platform::uvc_device> lock(dev);
-                    return _command_transfer->send_receive(data, timeout_ms, require_response);
+                    auto val =  _command_transfer->send_receive(data, timeout_ms, require_response);
+
+                    auto now = std::chrono::system_clock::now();
+                    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+                    //std::cout << "NOHA :: send_receive :: diff = " << diff << std::endl;
+
+                    return val;
                 });
         }
 

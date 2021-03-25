@@ -235,15 +235,23 @@ namespace librealsense
 
     rs2::frame colorizer::process_frame(const rs2::frame_source& source, const rs2::frame& f)
     {
+        std::cout << "NOHA :: colorizer  " << std::endl;
+        auto snr = ((frame_interface*)f.get())->get_sensor().get();
+        auto depth_sensor = As< librealsense::depth_sensor >(snr);
+
         if (f.get_profile().get() != _source_stream_profile.get())
         {
             _source_stream_profile = f.get_profile();
             _target_stream_profile = f.get_profile().clone(RS2_STREAM_DEPTH, f.get_profile().stream_index(), RS2_FORMAT_RGB8);
 
-            auto snr = ( (frame_interface *)f.get() )->get_sensor().get();
-            auto depth_sensor = As< librealsense::depth_sensor >( snr );
-            if( depth_sensor )
+            if (depth_sensor)
+            {
+                auto t1 = std::chrono::system_clock::now();
                 _depth_units = depth_sensor->get_depth_scale();
+                auto now = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+                std::cout << "NOHA :: process_frame (1) :: diff = " << diff << std::endl;
+            }
             else
             {
                 // For playback sensors
@@ -252,7 +260,11 @@ namespace librealsense
                     && extendable->extend_to( TypeToExtension< librealsense::depth_sensor >::value,
                                               (void **)( &depth_sensor ) ) )
                 {
+                    auto t1 = std::chrono::system_clock::now();
                     _depth_units = depth_sensor->get_depth_scale();
+                    auto now = std::chrono::system_clock::now();
+                    auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+                    std::cout << "NOHA :: process_frame (2) :: diff = " << diff << std::endl;
                 }
                 else
                 {
@@ -289,12 +301,12 @@ namespace librealsense
             }
         };
 
-        auto make_value_cropped_frame = [this](const rs2::video_frame& depth, rs2::video_frame rgb)
+        auto make_value_cropped_frame = [this, depth_sensor](const rs2::video_frame& depth, rs2::video_frame rgb)
         {
             auto depth_format = depth.get_profile().format();
             const auto w = depth.get_width(), h = depth.get_height();
             auto rgb_data = reinterpret_cast<uint8_t*>(const_cast<void *>(rgb.get_data()));
-
+            //std::mutex mutex;
             if (depth_format == RS2_FORMAT_DISPARITY32)
             {
                 auto depth_data = reinterpret_cast<const float*>(depth.get_data());
@@ -311,6 +323,10 @@ namespace librealsense
             }
             else if (depth_format == RS2_FORMAT_Z16)
             {
+                //std::lock_guard<std::mutex> lock(mutex);
+                auto t1 = std::chrono::system_clock::now();
+
+                _depth_units = depth_sensor->get_depth_scale();
                 auto depth_data = reinterpret_cast<const uint16_t*>(depth.get_data());
                 auto min = _min;
                 auto max = _max;
@@ -319,6 +335,9 @@ namespace librealsense
                     return (data * _depth_units - min) / (max - min);
                 };
                 make_rgb_data<uint16_t>(depth_data, rgb_data, w, h, coloring_function);
+                auto now = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+                std::cout << "NOHA :: colorizer :: diff = " << diff << std::endl;
             }
         };
 

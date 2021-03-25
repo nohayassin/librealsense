@@ -1545,13 +1545,16 @@ namespace librealsense
         const auto&& process_cb = make_callback([&, this](frame_holder f) {
             if (!f)
                 return;
-
+            auto t1 = std::chrono::system_clock::now();
             auto&& pbs = _profiles_to_processing_block[f->get_stream()];
             for (auto&& pb : pbs)
             {
                 f->acquire();
                 pb->invoke(f.frame);
             }
+            auto now = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+            //std::cout << "NOHA :: synthetic_sensor::start :: diff = "<< diff<<std::endl;
         });
 
         // Call the processing block on the frame

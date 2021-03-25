@@ -65,7 +65,14 @@ namespace librealsense
     void hw_monitor::execute_usb_command(uint8_t *out, size_t outSize, uint32_t & op, uint8_t * in, size_t & inSize) const
     {
         std::vector<uint8_t> out_vec(out, out + outSize);
+        auto t1 = std::chrono::system_clock::now();
+
         auto res = _locked_transfer->send_receive(out_vec);
+
+        auto now = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+
+       // std::cout << "NOHA :: execute_usb_command :: diff = " << diff << std::endl;
 
         // read
         if (in && inSize)
@@ -108,8 +115,20 @@ namespace librealsense
         uint32_t op{};
         size_t receivedCmdLen = HW_MONITOR_BUFFER_SIZE;
 
+        auto t1 = std::chrono::system_clock::now();
         execute_usb_command(details.sendCommandData.data(), details.sizeOfSendCommandData, op, outputBuffer, receivedCmdLen);
+
+        auto now = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+
+        //std::cout << "NOHA :: send_hw_monitor_command :: diff = " << diff << std::endl;
+
         update_cmd_details(details, receivedCmdLen, outputBuffer);
+
+        //auto now = std::chrono::system_clock::now();
+        //auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+
+        //std::cout << "NOHA :: send_hw_monitor_command :: diff = " << diff << std::endl;
     }
 
     std::vector< uint8_t > hw_monitor::send( std::vector< uint8_t > const & data ) const
@@ -120,12 +139,19 @@ namespace librealsense
     std::vector< uint8_t >
     hw_monitor::send( command cmd, hwmon_response * p_response, bool locked_transfer ) const
     {
+        auto t1 = std::chrono::system_clock::now();
+
         hwmon_cmd newCommand(cmd);
         auto opCodeXmit = static_cast<uint32_t>(newCommand.cmd);
 
         hwmon_cmd_details details;
         details.oneDirection = newCommand.oneDirection;
         details.timeOut = newCommand.timeOut;
+
+        auto now = std::chrono::system_clock::now();
+        auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+
+        //std::cout << "NOHA :: hw_monitor::send (1) :: diff = " << diff << std::endl;
 
         fill_usb_buffer(opCodeXmit,
             newCommand.param1,
@@ -137,13 +163,21 @@ namespace librealsense
             details.sendCommandData.data(),
             details.sizeOfSendCommandData);
 
+        
         if (locked_transfer)
         {
+             now = std::chrono::system_clock::now();
+             diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+
+            std::cout << "NOHA :: hw_monitor::send (2) :: diff = " << diff << std::endl;
             return _locked_transfer->send_receive({ details.sendCommandData.begin(),details.sendCommandData.end()});
         }
-
+        t1 = std::chrono::system_clock::now();
         send_hw_monitor_command(details);
+        now = std::chrono::system_clock::now();
+        diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
 
+        //std::cout << "NOHA :: hw_monitor::send (3) :: diff = " << diff << std::endl;
         // Error/exit conditions
         if( p_response )
             *p_response = hwm_Success;
@@ -165,11 +199,16 @@ namespace librealsense
             if( p_response )
             {
                 *p_response = err_type;
+                
+
                 return std::vector<uint8_t>();
             }
             throw invalid_value_exception( err );
         }
+         now = std::chrono::system_clock::now();
+         diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
 
+        //std::cout << "NOHA :: hw_monitor::send (4) :: diff = " << diff << std::endl;
         return std::vector<uint8_t>(newCommand.receivedCommandData,
             newCommand.receivedCommandData + newCommand.receivedCommandDataLength);
     }

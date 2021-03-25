@@ -93,14 +93,18 @@ namespace librealsense
                 found_depth_intrinsics = true;
             }
         }
-
-        if (!_depth_units)
-        {
+        //std::lock_guard<std::mutex> lock(_mutex);
+        auto t1 = std::chrono::system_clock::now();
+        //if (!_depth_units)
+        //{
             auto sensor = ((frame_interface*)depth.get())->get_sensor().get();
             _depth_units = sensor->get_option(RS2_OPTION_DEPTH_UNITS).query();
             found_depth_units = true;
-        }
-
+        //}
+            auto now = std::chrono::system_clock::now();
+            auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+            if (diff > 10) std::cout << "NOHA :: =================== pointcloud :: diff = " << diff << "========================" <<std::endl;
+            else std::cout << "NOHA :: pointcloud :: diff = "<< diff<<std::endl;
         set_extrinsics();
     }
 
@@ -378,7 +382,12 @@ namespace librealsense
         {
             if (f.is<rs2::depth_frame>())
             {
+                auto t1 = std::chrono::system_clock::now();
                 inspect_depth_frame(f);
+                auto now = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+                //std::cout << "NOHA :: process_frame :: inspect_depth_frame :: diff = "<< diff<<std::endl;
+
                 rv = process_depth_frame(source, f);
             }
             if (f.get_profile().stream_type() == _stream_filter.stream && f.get_profile().format() == _stream_filter.format)

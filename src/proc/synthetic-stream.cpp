@@ -39,8 +39,11 @@ namespace librealsense
             {
                 frame_interface* ptr = nullptr;
                 std::swap(f.frame, ptr);
-
+                auto t1 = std::chrono::system_clock::now();
                 _callback->on_frame((rs2_frame*)ptr, _source_wrapper.get_c_wrapper());
+                auto now = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+                //std::cout << "NOHA :: processing_block::invoke :: diff = " << diff << std::endl;
             }
         }
         catch (std::exception const & e)

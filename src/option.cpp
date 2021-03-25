@@ -110,6 +110,7 @@ std::vector<uint8_t> librealsense::command_transfer_over_xu::send_receive(const 
     return _uvc.invoke_powered([this, &data, require_response]
         (platform::uvc_device& dev)
         {
+            
             std::vector<uint8_t> result;
             std::lock_guard<platform::uvc_device> lock(dev);
 
@@ -125,17 +126,27 @@ std::vector<uint8_t> librealsense::command_transfer_over_xu::send_receive(const 
 
             if (!dev.set_xu(_xu, _ctrl, transmit_buf.data(), static_cast<int>(transmit_buf.size())))
                 throw invalid_value_exception(to_string() << "set_xu(ctrl=" << unsigned(_ctrl) << ") failed!" << " Last Error: " << strerror(errno));
-
+            
             if (require_response)
             {
                 result.resize(HW_MONITOR_BUFFER_SIZE);
+
+                auto t1 = std::chrono::system_clock::now();
                 if (!dev.get_xu(_xu, _ctrl, result.data(), static_cast<int>(result.size())))
                     throw invalid_value_exception(to_string() << "get_xu(ctrl=" << unsigned(_ctrl) << ") failed!" << " Last Error: " << strerror(errno));
-
+                
                 // Returned data size located in the last 4 bytes
                 auto data_size = *(reinterpret_cast<uint32_t*>(result.data() + HW_MONITOR_DATA_SIZE_OFFSET)) + SIZE_OF_HW_MONITOR_HEADER;
                 result.resize(data_size);
+
+                auto now = std::chrono::system_clock::now();
+                auto diff = std::chrono::duration_cast<std::chrono::milliseconds>(now - t1).count();
+
+                std::cout << "NOHA :: command_transfer_over_xu::send_receive :: diff = " << diff << std::endl;
             }
+
+            
+
             return result;
         });
 }
