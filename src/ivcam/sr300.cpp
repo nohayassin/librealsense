@@ -54,6 +54,13 @@ namespace librealsense
             return std::make_shared<sr305_camera>(ctx, _color, _depth, _hwm,
                 this->get_device_data(),
                 register_device_notifications);
+        case SR306_PID:
+        {
+            auto val = std::make_shared<sr300_depth_camera>(ctx, _depth, _hwm,
+                this->get_device_data(),
+                register_device_notifications);
+            return val;
+        }
         default:
             throw std::runtime_error(to_string() << "Unsupported SR300 model! 0x"
                 << std::hex << std::setw(4) << std::setfill('0') << (int)pid);
@@ -61,7 +68,7 @@ namespace librealsense
 
     }
 
-    std::shared_ptr<device_interface> sr300_depth_info::create(std::shared_ptr<context> ctx,
+    /*std::shared_ptr<device_interface> sr300_depth_info::create(std::shared_ptr<context> ctx,
         bool register_device_notifications) const
     {
         auto pid = _depth.pid;
@@ -72,7 +79,7 @@ namespace librealsense
         else
             throw std::runtime_error(to_string() << "Unsupported SR300 model! 0x"
                 << std::hex << std::setw(4) << std::setfill('0') << (int)pid);
-    }
+    }*/
 
     std::vector<std::shared_ptr<device_info>> sr300_info::pick_sr300_devices(
         std::shared_ptr<context> ctx,
@@ -86,38 +93,68 @@ namespace librealsense
         auto group_devices = group_devices_by_unique_id(correct_pid);
         for (auto& group : group_devices)
         {
-            if (group.size() == 2 &&
-                mi_present(group, 0) &&
-                mi_present(group, 2))
-            {
-                auto color = get_mi(group, 0);
-                auto depth = get_mi(group, 2);
-                platform::usb_device_info hwm;
+            platform::usb_device_info hwm;
+            platform::uvc_device_info dev0;
+            platform::uvc_device_info dev2;
 
-                if (ivcam::try_fetch_usb_device(usb, color, hwm))
-                {
-                    auto info = std::make_shared<sr300_info>(ctx, color, depth, hwm);
-                    chosen.push_back(color);
-                    chosen.push_back(depth);
-                    results.push_back(info);
-                }
-                else
+            if (mi_present(group, 0))
+            {
+                dev0 = get_mi(group, 0);
+                chosen.push_back(dev0);
+                if (!ivcam::try_fetch_usb_device(usb, dev0, hwm))
                 {
                     LOG_WARNING("try_fetch_usb_device(...) failed.");
+                    return results;
                 }
             }
-            else
+            if (mi_present(group, 2))
             {
-                LOG_WARNING("SR300 group_devices is empty.");
+                dev2 = get_mi(group, 2);
+                chosen.push_back(dev2);
             }
+
+            auto info = std::make_shared<sr300_info>(ctx, dev0, dev2, hwm);
+            results.push_back(info);
+
+            if (!dev0.pid && !dev2.pid)
+                LOG_WARNING("SR300 group_devices is empty.");
         }
 
         trim_device_list(uvc, chosen);
 
         return results;
     }
+    /*std::pair<std::vector<platform::uvc_device_info>, std::vector<std::shared_ptr<device_info>>> sr300_depth_info::picked_device(
+        std::shared_ptr<context> ctx,
+        std::vector<platform::usb_device_info>& usb,
+        platform::uvc_device_info& depth)
+    {
+        std::vector<platform::uvc_device_info> chosen;
+        std::vector<std::shared_ptr<device_info>> results;
 
-    std::vector<std::shared_ptr<device_info>> sr300_depth_info::pick_sr300_devices(
+        platform::usb_device_info hwm;
+
+        if (ivcam::try_fetch_usb_device(usb, depth, hwm))
+        {
+            auto info = std::make_shared<sr300_depth_info>(ctx, depth, hwm);
+            chosen.push_back(depth);
+            results.push_back(info);
+        }
+        else
+        {
+            LOG_WARNING("try_fetch_usb_device(...) failed.");
+        }
+        return { chosen, results };
+    }
+    std::pair<std::vector<platform::uvc_device_info>, std::vector<std::shared_ptr<device_info>>> sr300_info::picked_device(
+        std::shared_ptr<context> ctx,
+        std::vector<platform::usb_device_info>& usb, 
+        platform::uvc_device_info& color, 
+        platform::uvc_device_info& depth)
+    {
+
+    }*/
+    /*std::vector<std::shared_ptr<device_info>> sr300_depth_info::pick_sr300_devices(
         std::shared_ptr<context> ctx,
         std::vector<platform::uvc_device_info>& uvc,
         std::vector<platform::usb_device_info>& usb)
@@ -140,7 +177,7 @@ namespace librealsense
                     depth = get_mi(group, 2);
                 platform::usb_device_info hwm;
 
-                if (ivcam::try_fetch_usb_depth_device(usb, depth, hwm))
+                if (ivcam::try_fetch_usb_device(usb, depth, hwm))
                 {
                     auto info = std::make_shared<sr300_depth_info>(ctx, depth, hwm);
                     chosen.push_back(depth);
@@ -160,7 +197,7 @@ namespace librealsense
         trim_device_list(uvc, chosen);
 
         return results;
-    }
+    }*/
 
     std::shared_ptr<synthetic_sensor> sr300_camera::create_color_device(std::shared_ptr<context> ctx,
         const platform::uvc_device_info& color)

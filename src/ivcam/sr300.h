@@ -160,17 +160,18 @@ namespace librealsense
         rs2_timestamp_domain get_frame_timestamp_domain(const std::shared_ptr<frame_interface>& frame) const override;
     };
 
-    class sr300_depth_info : public device_info
+    class sr300_info : public device_info
     {
     public:
         std::shared_ptr<device_interface> create(std::shared_ptr<context> ctx,
             bool register_device_notifications) const override;
 
-        sr300_depth_info(std::shared_ptr<context> ctx,
+        sr300_info(std::shared_ptr<context> ctx,
+            platform::uvc_device_info color,
             platform::uvc_device_info depth,
             platform::usb_device_info hwm)
             : device_info(ctx),
-            _depth(std::move(depth)), _hwm(std::move(hwm)) {}
+            _color(std::move(color)), _depth(std::move(depth)), _hwm(std::move(hwm)) {}
 
         static std::vector<std::shared_ptr<device_info>> pick_sr300_devices(
             std::shared_ptr<context> ctx,
@@ -179,16 +180,18 @@ namespace librealsense
 
         platform::backend_device_group get_device_data() const override
         {
-            auto val =  platform::backend_device_group({ _depth }, { _hwm });
-            return val;
+            if (_color.pid)
+                return platform::backend_device_group({ _color, _depth }, { _hwm });
+            return platform::backend_device_group({ _depth }, { _hwm });
         }
 
-    protected:
+    private:
+        platform::uvc_device_info _color;
         platform::uvc_device_info _depth;
         platform::usb_device_info _hwm;
     };
 
-    class sr300_info : public sr300_depth_info
+    /*class sr300_info : public sr300_depth_info
     {
     public:
         std::shared_ptr<device_interface> create(std::shared_ptr<context> ctx,
@@ -200,20 +203,20 @@ namespace librealsense
             platform::usb_device_info hwm)
             : sr300_depth_info(ctx, depth, hwm), _color(std::move(color)) {}
 
-        static std::vector<std::shared_ptr<device_info>> pick_sr300_devices(
-            std::shared_ptr<context> ctx,
-            std::vector<platform::uvc_device_info>& platform,
-            std::vector<platform::usb_device_info>& usb);
-
         platform::backend_device_group get_device_data() const override
         {
             return platform::backend_device_group({ _color, _depth }, { _hwm });
         }
+        /*std::pair<std::vector<platform::uvc_device_info>, std::vector<std::shared_ptr<device_info>>> picked_device(
+            std::shared_ptr<context> ctx,
+            std::vector<platform::usb_device_info>& usb,
+            platform::uvc_device_info& color, 
+            platform::uvc_device_info& depth);
 
     private:
         platform::uvc_device_info _color;
 
-    };
+    };*/
     class sr300_depth_camera : public virtual device,
         public debug_interface,
         public updatable,
