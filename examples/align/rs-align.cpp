@@ -3,6 +3,7 @@
 
 #include <librealsense2/rs.hpp>
 #include "example-imgui.hpp"
+#include "example.hpp"
 
 /*
  This example introduces the concept of spatial stream alignment.
@@ -33,6 +34,13 @@ void render_slider(rect location, float* alpha, direction* dir);
 
 int main(int argc, char * argv[]) try
 {
+    auto serial = depth_with_stream_type_present(RS2_STREAM_COLOR);
+    if (serial.empty())
+    {
+        std::cerr << "The demo requires Realsense Depth camera with RGB sensor";
+        return EXIT_SUCCESS;;
+    }
+
     // Create and initialize GUI related objects
     window app(1280, 720, "RealSense Align Example"); // Simple window handling
     ImGui_ImplGlfw_Init(app, false);      // ImGui library intializition
@@ -42,8 +50,7 @@ int main(int argc, char * argv[]) try
     // Create a pipeline to easily configure and start the camera
     rs2::pipeline pipe;
     rs2::config cfg;
-    cfg.enable_stream(RS2_STREAM_DEPTH);
-    cfg.enable_stream(RS2_STREAM_COLOR);
+    cfg.enable_device(serial);
     pipe.start(cfg);
 
     // Define two align objects. One will be used to align

@@ -99,6 +99,13 @@ void render_simple_distance(const rs2::depth_frame& depth,
 
 int main(int argc, char * argv[]) try
 {
+    auto serial = depth_with_stream_type_present(RS2_STREAM_COLOR);
+    if (serial.empty())
+    {
+        std::cerr << "The demo requires Realsense Depth camera with RGB sensor";
+        return EXIT_SUCCESS;;
+    }
+
     // OpenGL textures for the color and depth frames
     texture depth_image, color_image;
 
@@ -133,10 +140,11 @@ int main(int argc, char * argv[]) try
     rs2::pipeline pipe;
 
     rs2::config cfg;
-    cfg.enable_stream(RS2_STREAM_DEPTH); // Enable default depth
+    cfg.enable_device(serial);
+    //cfg.enable_stream(RS2_STREAM_DEPTH); // Enable default depth
     // For the color stream, set format to RGBA
     // To allow blending of the color frame on top of the depth frame
-    cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGBA8);
+    //cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGBA8);
     auto profile = pipe.start(cfg);
 
     auto sensor = profile.get_device().first<rs2::depth_sensor>();
