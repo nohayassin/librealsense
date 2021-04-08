@@ -141,10 +141,10 @@ int main(int argc, char * argv[]) try
 
     rs2::config cfg;
     cfg.enable_device(serial);
-    //cfg.enable_stream(RS2_STREAM_DEPTH); // Enable default depth
+    cfg.enable_stream(RS2_STREAM_DEPTH); // Enable default depth
     // For the color stream, set format to RGBA
     // To allow blending of the color frame on top of the depth frame
-    //cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGBA8);
+    cfg.enable_stream(RS2_STREAM_COLOR, RS2_FORMAT_RGBA8);
     auto profile = pipe.start(cfg);
 
     auto sensor = profile.get_device().first<rs2::depth_sensor>();

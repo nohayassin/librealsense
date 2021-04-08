@@ -3,7 +3,6 @@
 
 #include <librealsense2/rs.hpp>
 #include "example-imgui.hpp"
-#include "example.hpp"
 
 /*
  This example introduces the concept of spatial stream alignment.
@@ -51,6 +50,8 @@ int main(int argc, char * argv[]) try
     rs2::pipeline pipe;
     rs2::config cfg;
     cfg.enable_device(serial);
+    cfg.enable_stream(RS2_STREAM_DEPTH);
+    cfg.enable_stream(RS2_STREAM_COLOR);
     pipe.start(cfg);
 
     // Define two align objects. One will be used to align

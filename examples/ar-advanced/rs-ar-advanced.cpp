@@ -82,6 +82,7 @@ int main(int argc, char * argv[]) try
     rs2::pipeline pipe;
     // Create a configuration for configuring the pipeline with a non default profile
     rs2::config cfg;
+    cfg.enable_device(serial);
     // Enable fisheye and pose streams
     cfg.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
     cfg.enable_stream(RS2_STREAM_FISHEYE, 1);

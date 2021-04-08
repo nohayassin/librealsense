@@ -11,7 +11,6 @@
 #include <float.h>
 #include "../example.hpp"
 
-
 inline rs2_quaternion quaternion_exp(rs2_vector v)
 {
     float x = v.x/2, y = v.y/2, z = v.z/2, th2, th = sqrtf(th2 = x*x + y*y + z*z);
