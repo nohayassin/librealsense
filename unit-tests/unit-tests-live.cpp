@@ -5923,101 +5923,88 @@ TEST_CASE("IR streaming functionality", "[live]")
 
     if (make_context(SECTION_FROM_TEST_NAME, &ctx))
     {
-        try
-        {
-            auto list = ctx.query_devices();
-            REQUIRE(list.size());
-            auto dev = list.front();
-            auto sensors = dev.query_sensors();
+        auto list = ctx.query_devices();
+        REQUIRE(list.size());
+        auto dev = list.front();
+        auto sensors = dev.query_sensors();
 
-            REQUIRE(dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE));
-            std::string device_type = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
-            int width = 848;
-            int height = 480;
-            /*bool usb3_device = is_usb3(dev);
-            int fps = usb3_device ? 30 : 15; // In USB2 Mode the devices will switch to lower FPS rates
-            int req_fps = usb3_device ? 60 : 30; // USB2 Mode has only a single resolution for 60 fps which is not sufficient to run the test
-            if (device_type == "L500")
+        REQUIRE(dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE));
+        std::string device_type = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
+        int width = 848;
+        int height = 480;
+        bool usb3_device = is_usb3(dev);
+        int fps = usb3_device ? 30 : 15; // In USB2 Mode the devices will switch to lower FPS rates
+        //int req_fps = usb3_device ? 60 : 30; // USB2 Mode has only a single resolution for 60 fps which is not sufficient to run the test
+        if (device_type == "L500")
+            width = 640;
+
+        //auto res = configure_all_supported_streams(dev, width, height, req_fps);
+
+        std::map<int, int> counters;
+        std::map<int, std::string> stream_names;
+        std::mutex mutex;
+        std::map<int, std::vector<unsigned long long>> frame_num;
+        // Define frame callback
+        // The callback is executed on a sensor thread and can be called simultaneously from multiple sensors
+        // Therefore any modification to common memory should be done under lock
+        auto callback = [&](const rs2::frame& frame)
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (rs2::frameset fs = frame.as<rs2::frameset>())
             {
-                req_fps = 30;
-                width = 640;
+                // With callbacks, all synchronized stream will arrive in a single frameset
+                for (const rs2::frame& f : fs)
+                {
+                    //auto fps = f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS);
+                    //frame_num[f.get_profile().unique_id()].push_back(f.get_frame_number());
+                    counters[f.get_profile().unique_id()]++;
+                }
             }
-            auto res = configure_all_supported_streams(dev, width, height, req_fps);*/
-
-            std::map<int, int> counters;
-            std::map<int, std::string> stream_names;
-            std::mutex mutex;
-
-            // Define frame callback
-            // The callback is executed on a sensor thread and can be called simultaneously from multiple sensors
-            // Therefore any modification to common memory should be done under lock
-            auto callback = [&](const rs2::frame& frame)
+            else
             {
-                std::lock_guard<std::mutex> lock(mutex);
-                if (rs2::frameset fs = frame.as<rs2::frameset>())
-                {
-                    // With callbacks, all synchronized stream will arrive in a single frameset
-                    for (const rs2::frame& f : fs)
-                    {
-                        auto fps = f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS);
-                        counters[f.get_profile().unique_id()]++;
-                    }
-                }
-                else
-                {
-                    // Stream that bypass synchronization (such as IMU) will produce single frames
-                    counters[frame.get_profile().unique_id()]++;
-                }
-            };
-
-            // Declare RealSense pipeline, encapsulating the actual device and sensors.
-            rs2::pipeline pipe;
-
-            // CONFIG HERE:
-            rs2::config cfg;
-            //cfg.enable_all_streams();
-            cfg.disable_all_streams();   
-            cfg.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_ANY, 60);   
-            cfg.enable_stream(RS2_STREAM_INFRARED, width, height, RS2_FORMAT_ANY, 60);
-            cfg.disable_stream(RS2_STREAM_DEPTH);
-            cfg.disable_stream(RS2_STREAM_ACCEL);
-            cfg.disable_stream(RS2_STREAM_GYRO);
-
-            // Start streaming through the callback with default recommended configuration
-            // The default video configuration contains Depth and Color streams
-            // If a device is capable to stream IMU data, both Gyro and Accelerometer are enabled by default
-
-            rs2::pipeline_profile profiles = pipe.start(cfg, callback);
-
-            // Collect the enabled streams names
-            for (auto p : profiles.get_streams())
-                stream_names[p.unique_id()] = p.stream_name();
-
-            std::cout << "RealSense callback sample" << std::endl << std::endl;
-
-            while (true)
-            {
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-
-                std::lock_guard<std::mutex> lock(mutex);
-
-                for (auto p : counters)
-                {
-                    std::cout << stream_names[p.first] << "[" << p.first << "]: " << p.second << " [frames] || ";
-                }
-                std::cout << std::endl;
+                // Stream that bypass synchronization (such as IMU) will produce single frames
+                //frame_num[frame.get_profile().unique_id()].push_back(frame.get_frame_number());
+                counters[frame.get_profile().unique_id()]++;
             }
+        };
 
-        }
-        catch (const rs2::error& e)
+        bool enable_depth[2] = { true, false };
+        // Declare RealSense pipeline, encapsulating the actual device and sensors.
+        rs2::pipeline pipe;
+        rs2::config cfg;
+        cfg.disable_all_streams();
+        cfg.disable_stream(RS2_STREAM_ACCEL);
+        cfg.disable_stream(RS2_STREAM_GYRO);
+        cfg.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_ANY, 60);
+        cfg.enable_stream(RS2_STREAM_INFRARED, width, height, RS2_FORMAT_ANY, 60);
+        cfg.enable_stream(RS2_STREAM_DEPTH, width, height, RS2_FORMAT_ANY, 60);
+
+        //cfg.disable_stream(RS2_STREAM_DEPTH);
+        
+
+        // Start streaming through the callback with default recommended configuration
+        // The default video configuration contains Depth and Color streams
+        // If a device is capable to stream IMU data, both Gyro and Accelerometer are enabled by default
+
+        rs2::pipeline_profile profiles = pipe.start(cfg, callback);
+
+        // Collect the enabled streams names
+        for (auto p : profiles.get_streams())
+            stream_names[p.unique_id()] = p.stream_name();
+
+        std::cout << "RealSense callback sample" << std::endl << std::endl;
+
+        while (true)
         {
-            std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
-            ///return EXIT_FAILURE;
-        }
-        catch (const std::exception& e)
-        {
-            std::cerr << e.what() << std::endl;
-            //return EXIT_FAILURE;
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+
+            std::lock_guard<std::mutex> lock(mutex);
+
+            for (auto p : counters)
+            {
+                std::cout << stream_names[p.first] << "[" << p.first << "]: " << p.second << " [frames] ||";
+            }
+            std::cout << std::endl;
         }
     }
 }
