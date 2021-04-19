@@ -5916,6 +5916,27 @@ TEST_CASE("l500_presets_set_preset", "[live]")
     }
 }
 
+void set_exposure(device_list& list, float value)
+{
+    // set exposure limit to > 1000/fps
+    for (auto&& device : list)
+    {
+        if (std::string(device.get_info(RS2_CAMERA_INFO_PRODUCT_LINE)) != "D400")
+            continue;
+        auto sensors = device.query_sensors();
+        for (auto& s : sensors)
+        {
+            std::string val = s.get_info(RS2_CAMERA_INFO_NAME);
+            if (!s.supports(RS2_OPTION_EXPOSURE))
+                continue;
+            auto range = s.get_option_range(RS2_OPTION_EXPOSURE);
+            CAPTURE(val);
+            CAPTURE(range);
+            s.set_option(RS2_OPTION_EXPOSURE, value);
+            auto c_val = s.get_option(RS2_OPTION_EXPOSURE);
+        }
+    }
+}
 TEST_CASE("IR streaming functionality", "[live]")
 {
     // Require at least one device to be plugged in
@@ -5925,86 +5946,115 @@ TEST_CASE("IR streaming functionality", "[live]")
     {
         auto list = ctx.query_devices();
         REQUIRE(list.size());
-        auto dev = list.front();
-        auto sensors = dev.query_sensors();
-
-        REQUIRE(dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE));
-        std::string device_type = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
+        REQUIRE(list.front().supports(RS2_CAMERA_INFO_PRODUCT_LINE));
+        std::string device_type = list.front().get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
         int width = 848;
         int height = 480;
-        bool usb3_device = is_usb3(dev);
-        int fps = usb3_device ? 30 : 15; // In USB2 Mode the devices will switch to lower FPS rates
-        //int req_fps = usb3_device ? 60 : 30; // USB2 Mode has only a single resolution for 60 fps which is not sufficient to run the test
         if (device_type == "L500")
             width = 640;
 
-        //auto res = configure_all_supported_streams(dev, width, height, req_fps);
-
-        std::map<int, int> counters;
         std::map<int, std::string> stream_names;
         std::mutex mutex;
-        std::map<int, std::vector<unsigned long long>> frame_num;
-        // Define frame callback
-        // The callback is executed on a sensor thread and can be called simultaneously from multiple sensors
-        // Therefore any modification to common memory should be done under lock
-        auto callback = [&](const rs2::frame& frame)
+        std::mutex mutex_process;
+        std::map<int, std::vector<unsigned long long>> frames_num;
+
+        auto process_frame = [&](const rs2::frame& f)
+        {
+            std::lock_guard<std::mutex> lock(mutex_process);
+            auto stream_type = f.get_profile().stream_name();
+            auto frame_num = f.get_frame_number();
+            auto unique_id = f.get_profile().unique_id();
+            if (std::find(frames_num[unique_id].begin(), frames_num[unique_id].end(), frame_num) != frames_num[unique_id].end()) // check if frame is already processed
+                return;
+            frames_num[unique_id].push_back(frame_num);
+        };
+        auto frame_callback = [&](const rs2::frame& f)
         {
             std::lock_guard<std::mutex> lock(mutex);
-            if (rs2::frameset fs = frame.as<rs2::frameset>())
+            if (rs2::frameset fs = f.as<rs2::frameset>())
             {
                 // With callbacks, all synchronized stream will arrive in a single frameset
-                for (const rs2::frame& f : fs)
+                for (const rs2::frame& ff : fs)
                 {
-                    //auto fps = f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS);
-                    //frame_num[f.get_profile().unique_id()].push_back(f.get_frame_number());
-                    counters[f.get_profile().unique_id()]++;
+                    process_frame(ff);
                 }
             }
             else
             {
                 // Stream that bypass synchronization (such as IMU) will produce single frames
-                //frame_num[frame.get_profile().unique_id()].push_back(frame.get_frame_number());
-                counters[frame.get_profile().unique_id()]++;
+                process_frame(f);
             }
         };
 
-        bool enable_depth[2] = { true, false };
-        // Declare RealSense pipeline, encapsulating the actual device and sensors.
-        rs2::pipeline pipe;
+
+        bool baseline_cfgs[2] = { true, false };
+        bool depth_cfg[2] = { true, false };
         rs2::config cfg;
         cfg.disable_all_streams();
         cfg.disable_stream(RS2_STREAM_ACCEL);
         cfg.disable_stream(RS2_STREAM_GYRO);
         cfg.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_ANY, 60);
         cfg.enable_stream(RS2_STREAM_INFRARED, width, height, RS2_FORMAT_ANY, 60);
-        cfg.enable_stream(RS2_STREAM_DEPTH, width, height, RS2_FORMAT_ANY, 60);
-
-        //cfg.disable_stream(RS2_STREAM_DEPTH);
         
 
-        // Start streaming through the callback with default recommended configuration
-        // The default video configuration contains Depth and Color streams
-        // If a device is capable to stream IMU data, both Gyro and Accelerometer are enabled by default
-
-        rs2::pipeline_profile profiles = pipe.start(cfg, callback);
-
-        // Collect the enabled streams names
-        for (auto p : profiles.get_streams())
-            stream_names[p.unique_id()] = p.stream_name();
-
-        std::cout << "RealSense callback sample" << std::endl << std::endl;
-
-        while (true)
+        for (auto& depth : depth_cfg)
         {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::map<int, std::vector<unsigned long long>> baseline_frames_num;
+            std::map<int, std::vector<unsigned long long>> test_frames_num;
 
-            std::lock_guard<std::mutex> lock(mutex);
+            std::cout << "==============================================" << std::endl;
+            if (depth)
+                cfg.enable_stream(RS2_STREAM_DEPTH, width, height, RS2_FORMAT_ANY, 60);
+            else
+                cfg.disable_stream(RS2_STREAM_DEPTH);
 
-            for (auto p : counters)
+            for (auto baseline : baseline_cfgs)
             {
-                std::cout << stream_names[p.first] << "[" << p.first << "]: " << p.second << " [frames] ||";
+
+                frames_num.clear();
+                rs2::pipeline pipe;
+                std::cout << std::endl;
+                if (baseline)
+                {
+                    std::cout << "----------- Baseline configuration is running .. -----------" << std::endl;
+                    set_exposure(list, 1); // set exposure to min value
+                }
+                else
+                {
+                    std::cout << "----------- Test configuration is running .. -----------" << std::endl;
+                    set_exposure(list, 9000);
+                }
+
+                rs2::pipeline_profile profiles = pipe.start(cfg, frame_callback);
+                // Collect the enabled streams names
+                for (auto p : profiles.get_streams())
+                    stream_names[p.unique_id()] = p.stream_name();
+
+                for (auto i = 0; i < 10; i++)
+                {
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    std::lock_guard<std::mutex> lock(mutex);
+                    for (auto f : frames_num)
+                    {
+                        std::cout << stream_names[f.first] << "[" << f.first << "]: " << f.second.size() << " [frames] ||";
+                    }
+                    std::cout << std::endl;
+                }
+                if(baseline)
+                    baseline_frames_num = frames_num;
+                else
+                    test_frames_num = frames_num;
             }
-            std::cout << std::endl;
+            
+            // Analysis
+            for (auto f : baseline_frames_num)
+            {
+                auto unique_id = f.first;
+                auto test_frames_size = test_frames_num[unique_id].size();
+                auto baseline_frames_size = baseline_frames_num[unique_id].size();
+                CAPTURE(baseline_frames_size, test_frames_size);
+                REQUIRE(test_frames_size/ baseline_frames_size > 0.5);
+            }
         }
     }
 }
