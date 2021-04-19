@@ -6052,8 +6052,9 @@ TEST_CASE("IR streaming functionality", "[live]")
                 auto unique_id = f.first;
                 auto test_frames_size = test_frames_num[unique_id].size();
                 auto baseline_frames_size = baseline_frames_num[unique_id].size();
+                double ratio = ((double)test_frames_size) / baseline_frames_size;
                 CAPTURE(baseline_frames_size, test_frames_size);
-                REQUIRE(test_frames_size/ baseline_frames_size > 0.5);
+                CHECK(ratio > 0.5);
             }
         }
     }
