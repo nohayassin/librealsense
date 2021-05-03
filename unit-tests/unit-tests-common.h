@@ -108,14 +108,16 @@ inline void set_exposure(rs2::device_list& list, float value)
         auto sensors = device.query_sensors();
         for (auto& s : sensors)
         {
-            std::string val = s.get_info(RS2_CAMERA_INFO_NAME);
-            if (!s.supports(RS2_OPTION_EXPOSURE))
+            auto info = std::string(s.get_info(RS2_CAMERA_INFO_NAME));
+            if (!s.supports(RS2_OPTION_EXPOSURE) || info != "Stereo Module") // set exposure only for IR/Depth streams
                 continue;
+            
             auto range = s.get_option_range(RS2_OPTION_EXPOSURE);
-            CAPTURE(val);
+            CAPTURE(info);
             CAPTURE(range);
             s.set_option(RS2_OPTION_EXPOSURE, value);
             auto c_val = s.get_option(RS2_OPTION_EXPOSURE);
+            break; // exposure for IR/Septh is set
         }
     }
 }

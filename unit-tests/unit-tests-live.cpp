@@ -18,7 +18,7 @@
 
 using namespace rs2;
 
-constexpr int ITERATIONS_PER_CONFIG = 10;
+constexpr int RECEIVE_FRAMES_TIME = 5;
 
 TEST_CASE("Sync sanity", "[live][mayfail]") {
 
@@ -5927,28 +5927,78 @@ TEST_CASE("IR streaming functionality", "[live]")
     {
         auto list = ctx.query_devices();
         REQUIRE(list.size());
-        REQUIRE(list.front().supports(RS2_CAMERA_INFO_PRODUCT_LINE));
+        auto dev = list.front();
+        auto sensors = dev.query_sensors();
+        REQUIRE(dev.supports(RS2_CAMERA_INFO_PRODUCT_LINE));
         std::string device_type = list.front().get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
         int width = 848;
         int height = 480;
         if (device_type == "L500")
             width = 640;
 
-        std::map<int, std::string> stream_names;
+        sensor rgb_sensor;
+        sensor ir_sensor;
+        std::vector<rs2::stream_profile > rgb_stream_profile;
+        std::vector<rs2::stream_profile > ir_stream_profile;
+        for (auto& s : sensors)
+        {
+            auto info = std::string(s.get_info(RS2_CAMERA_INFO_NAME));
+            if (info == "RGB Camera")
+                rgb_sensor = s;
+            if (info == "Stereo Module")
+                ir_sensor = s;
+        }
+        auto res = configure_all_supported_streams(dev, width, height, 60);
+        for (auto& profile : res.second)
+        {
+            auto fps = profile.fps;
+            for (auto& s : res.first)
+            {
+                auto stream_profiles = s.get_stream_profiles();
+                for (auto& sp : stream_profiles)
+                {
+                    if (!(sp.stream_type() == profile.stream && sp.fps() == fps && sp.stream_index() == profile.index && sp.format() == profile.format)) continue;
+                    auto vid = sp.as<rs2::video_stream_profile>();
+                    auto h = vid.height();
+                    auto w = vid.width();
+                    auto format = vid.format(); // RS2_FORMAT_YUYV ?
+                    if (!(w == profile.width && h == profile.height)) continue;
+                    if (sp.stream_type() == RS2_STREAM_COLOR)
+                        rgb_stream_profile.push_back(sp);
+                    if (sp.stream_type() == RS2_STREAM_INFRARED)
+                        ir_stream_profile.push_back(sp);
+                }
+            }
+        }
+        typedef enum configuration
+        {
+            IR_ONLY,
+            IR_RGB,
+            IR_RGB_EXPOSURE
+        }configuration;
+
+        configuration tests[3] = { IR_ONLY, IR_RGB, IR_RGB_EXPOSURE };
+        std::map< configuration, std::map<int, std::vector<unsigned long long>>> frames_num_info;
+        std::map < configuration, rs2_metadata_type> actual_fps;
+        std::map<int, std::vector<unsigned long long>> curr_frames_num_info;
+        rs2_metadata_type curr_actual_fps = 0;
         std::mutex mutex;
-        std::mutex mutex_process;
-        std::map<int, std::vector<unsigned long long>> frames_num;
+        std::map<int, std::string> stream_names;
 
         auto process_frame = [&](const rs2::frame& f)
         {
-            std::lock_guard<std::mutex> lock(mutex_process);
             auto stream_type = f.get_profile().stream_name();
             auto frame_num = f.get_frame_number();
             auto unique_id = f.get_profile().unique_id();
-            if (std::find(frames_num[unique_id].begin(), frames_num[unique_id].end(), frame_num) != frames_num[unique_id].end()) // check if frame is already processed
+            if (std::find(curr_frames_num_info[unique_id].begin(), curr_frames_num_info[unique_id].end(), frame_num) != curr_frames_num_info[unique_id].end()) // check if frame is already processed
                 return;
-            frames_num[unique_id].push_back(frame_num);
+            curr_frames_num_info[unique_id].push_back(frame_num);
+            if (std::string(stream_type) == "Color")
+                return;
+            if(!curr_actual_fps)
+                curr_actual_fps = f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS);
         };
+
         auto frame_callback = [&](const rs2::frame& f)
         {
             std::lock_guard<std::mutex> lock(mutex);
@@ -5966,76 +6016,57 @@ TEST_CASE("IR streaming functionality", "[live]")
                 process_frame(f);
             }
         };
-
-        bool baseline_cfgs[2] = { true, false };
-        bool depth_cfg[2] = { true, false };
-        rs2::config cfg;
-        cfg.disable_all_streams();
-        cfg.disable_stream(RS2_STREAM_ACCEL);
-        cfg.disable_stream(RS2_STREAM_GYRO);
-        cfg.enable_stream(RS2_STREAM_COLOR, width, height, RS2_FORMAT_ANY, 60);
-        cfg.enable_stream(RS2_STREAM_INFRARED, width, height, RS2_FORMAT_ANY, 60);
-
-
-        for (auto& depth : depth_cfg)
+        rgb_sensor.close();
+        ir_sensor.close();
+        for (auto& test : tests)
         {
-            std::map<int, std::vector<unsigned long long>> baseline_frames_num;
-            std::map<int, std::vector<unsigned long long>> test_frames_num;
+            curr_actual_fps = 0;
 
-            std::cout << "==============================================" << std::endl;
-            if (depth)
-                cfg.enable_stream(RS2_STREAM_DEPTH, width, height, RS2_FORMAT_ANY, 60);
-            else
-                cfg.disable_stream(RS2_STREAM_DEPTH);
+            if (test == IR_RGB_EXPOSURE)
+                set_exposure(list, 90000); // set exposure value to x > 1000/fps
 
-            for (auto baseline : baseline_cfgs)
+            ir_sensor.open(ir_stream_profile); // ir streams in all configurations
+            ir_sensor.start(frame_callback);
+            if (test == IR_RGB || test == IR_RGB_EXPOSURE)
             {
-
-                frames_num.clear();
-                rs2::pipeline pipe;
-                std::cout << std::endl;
-                if (baseline)
-                {
-                    std::cout << "----------- Baseline configuration is running .. -----------" << std::endl;
-                    set_exposure(list, 1); // set exposure to min value
-                }
-                else
-                {
-                    std::cout << "----------- Test configuration is running .. -----------" << std::endl;
-                    set_exposure(list, 9000);
-                }
-
-                rs2::pipeline_profile profiles = pipe.start(cfg, frame_callback);
-                // Collect the enabled streams names
-                for (auto p : profiles.get_streams())
-                    stream_names[p.unique_id()] = p.stream_name();
-
-                for (auto i = 0; i < ITERATIONS_PER_CONFIG; i++)
-                {
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                    std::lock_guard<std::mutex> lock(mutex);
-                    for (auto f : frames_num)
-                    {
-                        std::cout << stream_names[f.first] << "[" << f.first << "]: " << f.second.size() << " [frames] ||";
-                    }
-                    std::cout << std::endl;
-                }
-                if (baseline)
-                    baseline_frames_num = frames_num;
-                else
-                    test_frames_num = frames_num;
+                rgb_sensor.open(rgb_stream_profile);
+                rgb_sensor.start(frame_callback);
             }
 
-            // Analysis
-            for (auto f : baseline_frames_num)
+            std::cout << "==============================================" << std::endl << std::endl;
+            curr_frames_num_info.clear();
+
+            std::this_thread::sleep_for(std::chrono::seconds(RECEIVE_FRAMES_TIME));
+            ir_sensor.stop();
+            ir_sensor.close();
+            if (test == IR_RGB || test == IR_RGB_EXPOSURE)
             {
-                auto unique_id = f.first;
-                auto test_frames_size = test_frames_num[unique_id].size();
-                auto baseline_frames_size = baseline_frames_num[unique_id].size();
-                double ratio = ((double)test_frames_size) / baseline_frames_size;
-                CAPTURE(baseline_frames_size, test_frames_size);
-                CHECK(ratio > 0.5);
+                set_exposure(list, 1);
+                rgb_sensor.stop();
+                rgb_sensor.close();
             }
+
+            for (auto f : curr_frames_num_info)
+            {
+                std::cout << stream_names[f.first] << "[" << f.first << "]: " << f.second.size() << " [frames] ||";
+            }
+            std::cout << std::endl;
+
+            frames_num_info[test] = curr_frames_num_info;
+            actual_fps[test] = curr_actual_fps;
+        }
+
+        // Analysis
+        // Check if number of arrived frames for each stream type matches the number of
+        // expected number of frames of that stream
+        for (auto& test : tests)
+        {
+            auto expected_frames = actual_fps[test] * RECEIVE_FRAMES_TIME; // 5 seconds
+            auto ir1_ratio = ((double)frames_num_info[test][1].size()) / expected_frames;
+            auto ir2_ratio = ((double)frames_num_info[test][2].size()) / expected_frames;
+            CAPTURE(ir1_ratio, ir2_ratio);
+            CHECK(ir1_ratio > 0.8);
+            CHECK(ir2_ratio > 0.8);
         }
     }
 }
