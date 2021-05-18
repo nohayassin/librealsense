@@ -67,6 +67,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
     rs2_metadata_type curr_actual_fps = 0;
     std::mutex mutex;
     std::map<int, std::string> stream_names;
+    bool wait_for_exposure = false;
 
     auto process_frame = [&](const rs2::frame& f)
     {
@@ -84,6 +85,8 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
 
     auto frame_callback = [&](const rs2::frame& f)
     {
+        if (wait_for_exposure) // process frames only after exposure is stable
+            return;
         std::lock_guard<std::mutex> lock(mutex);
         if (rs2::frameset fs = f.as<rs2::frameset>())
         {
@@ -103,9 +106,10 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
     for (auto& test : tests)
     {
         curr_actual_fps = 0;
+        wait_for_exposure = false;
 
-        if (test == IR_RGB_EXPOSURE)
-            ir_sensor.set_option(RS2_OPTION_EXPOSURE, 18000); // set exposure value to x > 1000/fps
+        if(test == IR_RGB_EXPOSURE)
+            wait_for_exposure = true; // callback will process frames only after exposure value is set
 
         ir_sensor.open(ir_stream_profile); // ir streams in all configurations
         ir_sensor.start(frame_callback);
@@ -114,8 +118,16 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
             rgb_sensor.open(rgb_stream_profile);
             rgb_sensor.start(frame_callback);
         }
+        if (test == IR_RGB_EXPOSURE)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(5)); // modify exposure 5 seconds after start streaming ( according to repro description )
+            ir_sensor.set_option(RS2_OPTION_EXPOSURE, 18000); // set exposure value to x > 1000/fps
+            std::this_thread::sleep_for(std::chrono::milliseconds(100)); // wait 100 msec to process FW command
+            wait_for_exposure = false; // exposure value is set - callback will start processing frames
+        }
 
-        std::cout << "==============================================" << std::endl << std::endl;
+        std::cout << "==============================================" << std::endl;
+        std::cout << "Configuration " << test << std::endl << std::endl;
         curr_frames_num_info.clear();
 
         std::this_thread::sleep_for(std::chrono::seconds(RECEIVE_FRAMES_TIME));
@@ -144,8 +156,9 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
     for (auto& test : tests)
     {
         auto expected_frames = actual_fps[test] * RECEIVE_FRAMES_TIME; // 5 seconds
-        auto ir_ratio = ((double)frames_num_info[test][1].size()) / expected_frames; // IR1
-        CAPTURE(ir_ratio);
+        auto arrived_frames = (double)frames_num_info[test][1].size(); // IR1
+        auto ir_ratio = arrived_frames / expected_frames;
+        CAPTURE(test, arrived_frames, expected_frames, actual_fps[test], ir_ratio);
         CHECK(ir_ratio > 0.8);
     }
 }
