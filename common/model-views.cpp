@@ -2194,6 +2194,8 @@ namespace rs2
         _stream_not_alive(std::chrono::milliseconds(1500)),
         _stabilized_reflectivity(10)
     {
+        auto pid = getpid();
+        std::cout << "NOHA :: stream_model::stream_model() :: pid = "<< pid<<std::endl;
         show_map_ruler = config_file::instance().get_or_default(
             configurations::viewer::show_map_ruler, true);
         show_stream_details = config_file::instance().get_or_default(
@@ -2428,32 +2430,42 @@ namespace rs2
     {
         if (dev->roi_checked)
         {
+            auto pid = getpid();
+            std::cout << "NOHA :: update_ae_roi_rect :: this = " << this << std::endl;
+            //std::cout << "NOHA :: update_ae_roi_rect :: (1)" <<std::endl;
             auto&& sensor = dev->s;
             // Case 1: Starting Dragging of the ROI rect
             // Pre-condition: not capturing already + mouse is down + we are inside stream rect
             auto val11 = mouse.mouse_down[0];
             auto val22 = stream_rect.contains(mouse.cursor);
+            //std::cout << "NOHA :: update_ae_roi_rect :: (00000000000000000):: x  = " << roi_display_rect.x << ",  y = " << roi_display_rect.y << std::endl;
             if (!capturing_roi && mouse.mouse_down[0] && stream_rect.contains(mouse.cursor))
             {   
+                //std::cout << "NOHA :: update_ae_roi_rect :: (2):: x  = " << roi_display_rect.x << ",  y = " << roi_display_rect.y << std::endl;
                 // Initialize roi_display_rect with drag-start position
                 roi_display_rect.x = mouse.cursor.x;
                 roi_display_rect.y = mouse.cursor.y;
                 roi_display_rect.w = 0; // Still unknown, will be update later
                 roi_display_rect.h = 0;
                 capturing_roi = true; // Mark that we are in process of capturing the ROI rect
+                std::cout << "NOHA :: update_ae_roi_rect :: (2.1):: x  = " << roi_display_rect.x << ",  y = " << roi_display_rect.y << std::endl;
             }
             // Case 2: We are in the middle of dragging (capturing) ROI rect and we did not leave the stream boundaries
             if (capturing_roi && stream_rect.contains(mouse.cursor))
             {
+                std::cout << "NOHA :: update_ae_roi_rect :: (3) :: x  = "<< roi_display_rect.x << ",  y = "<< roi_display_rect.y << std::endl;
+                std::cout << "NOHA :: update_ae_roi_rect :: mouse :: (3) :: x  = " << mouse.cursor.x << ",  y = " << mouse.cursor.y << std::endl;
                 // x,y remain the same, only update the width,height with new mouse position relative to starting mouse position
                 roi_display_rect.w = mouse.cursor.x - roi_display_rect.x;
                 roi_display_rect.h = mouse.cursor.y - roi_display_rect.y;
+                //std::cout << "NOHA :: update_ae_roi_rect :: (3.0) :: capturing_roi = " << capturing_roi << std::endl;
             }
             // Case 3: We are in middle of dragging (capturing) and mouse was released
             auto val1 = !mouse.mouse_down[0];
             auto val2 = stream_rect.contains(mouse.cursor);
             if (!mouse.mouse_down[0] && capturing_roi && stream_rect.contains(mouse.cursor))
             {
+                std::cout << "NOHA :: update_ae_roi_rect :: (4):: x  = " << roi_display_rect.x << "y = " << roi_display_rect.y << std::endl;
                 // Update width,height one last time
                 roi_display_rect.w = mouse.cursor.x - roi_display_rect.x;
                 roi_display_rect.h = mouse.cursor.y - roi_display_rect.y;
@@ -2461,6 +2473,7 @@ namespace rs2
 
                 if (roi_display_rect) // If the rect is not empty?
                 {
+                    std::cout << "NOHA :: update_ae_roi_rect :: (5):: x  = " << roi_display_rect.x << "y = " << roi_display_rect.y << std::endl;
                     // Convert from local (pixel) coordinate system to device coordinate system
                     auto r = roi_display_rect;
                     r = r.normalize(stream_rect).unnormalize(_normalized_zoom.unnormalize(get_original_stream_bounds()));
@@ -2489,6 +2502,7 @@ namespace rs2
                 }
                 else // If the rect is empty
                 {
+                    std::cout << "NOHA :: update_ae_roi_rect :: (6)" << std::endl;
                     try
                     {
                         // To reset ROI, just set ROI to the entire frame
@@ -2517,20 +2531,23 @@ namespace rs2
             // If we left stream bounds while capturing, stop capturing
             if (capturing_roi && !stream_rect.contains(mouse.cursor))
             {
+                std::cout << "NOHA :: update_ae_roi_rect :: (7)" << std::endl;
                 capturing_roi = false;
             }
 
             // When not capturing, just refresh the ROI rect in case the stream box moved
             if (!capturing_roi)
             {
+                std::cout << "NOHA :: update_ae_roi_rect :: (8):: x  = " << roi_display_rect.x << ", y" << roi_display_rect.y << std::endl;
                 auto r = dev->roi_rect; // Take the current from device, convert to local coordinates
                 r = r.normalize(_normalized_zoom.unnormalize(get_original_stream_bounds())).unnormalize(stream_rect).cut_by(stream_rect);
                 roi_display_rect = r;
             }
-
+           // std::cout << "NOHA :: update_ae_roi_rect :: (9)" << std::endl;
             // Display ROI rect
             glColor3f(1.0f, 1.0f, 1.0f);
             outline_rect(roi_display_rect);
+            //std::cout << "NOHA :: update_ae_roi_rect :: (0000000xxxxx0000000):: x  = " << roi_display_rect.x << ",  y = " << roi_display_rect.y << std::endl;
         }
     }
 
@@ -3622,9 +3639,11 @@ namespace rs2
         }
         return dev->normalized_zoom;
     }
-
+#include <thread>
     void stream_model::show_frame(const rect& stream_rect, const mouse_info& g, std::string& error_message)
     {
+        auto pid = getpid();
+        //std::cout <<"NOHA :: show_frame :: pid = "<<pid <<std::endl;
         auto zoom_val = 1.f;
         if (stream_rect.contains(g.cursor))
         {
@@ -3648,7 +3667,9 @@ namespace rs2
             g, is_middle_clicked,
             zoom_val);
         texture->show(stream_rect, 1.f, _normalized_zoom);
-
+        auto val1 = dev;
+        auto val2 = dev->show_algo_roi;
+        auto cond = dev && dev->show_algo_roi;
         if (dev && dev->show_algo_roi)
         {
             rect r{ float(dev->algo_roi.min_x), float(dev->algo_roi.min_y),
@@ -3666,7 +3687,7 @@ namespace rs2
 
             glColor3f(1.f, 1.f, 1.f);
             roi_percentage = dev->roi_percentage;
-            roi_display_rect = r;
+            //roi_display_rect = r;
         }
 
         update_ae_roi_rect(stream_rect, g, error_message);

@@ -1673,14 +1673,25 @@ namespace rs2
         {
             show_no_stream_overlay(font2, static_cast<int>(view_rect.x), static_cast<int>(view_rect.y), static_cast<int>(win.width()), static_cast<int>(win.height() - output_height));
         }
+        bool count = true;
         for (auto &&kvp : layout)
         {
+            /*if (count)
+            {
+                count = false;
+                continue;
+            }*/
+
+            //std::cout << "---------------- show_frame ------------------ :: layout.size() = "<< layout.size() <<std::endl;
             auto&& view_rect = kvp.second;
             auto stream = kvp.first;
             auto&& stream_mv = streams[stream];
             auto&& stream_size = stream_mv.size;
             auto stream_rect = view_rect.adjust_ratio(stream_size).grow(-3);
 
+            auto mouse_ = win.get_mouse();
+            //std::cout << "NOHA :: render_2d_view :: mouse_ :: x = "<< mouse_.cursor.x<< " - y= "<<mouse_.cursor.y << std::endl;
+            //std::cout << "NOHA :: render_2d_view :: stream_rect :: x = " << stream_rect.x << " - y= " << stream_rect.y <<  " -h = "<< stream_rect.h << " - w = "<< stream_rect.w<<std::endl;
             stream_mv.show_frame(stream_rect, mouse, error_message);
 
             auto p = stream_mv.dev->dev.as<playback>();
@@ -3323,6 +3334,7 @@ namespace rs2
         ux_window& window, int devices, std::string& error_message, 
         std::shared_ptr<texture_buffer> texture, points points)
     {
+        //std::cout <<"NOHA :: viewer_model::draw_viewport" <<std::endl;
         if (!modal_notification_on)
             updates->draw(not_model, window, error_message);
 
@@ -3335,6 +3347,8 @@ namespace rs2
 
         if (!is_3d_view)
         {
+            auto mouse_ = window.get_mouse();
+            //std::cout <<"NOHA :: viewer_model::draw_viewport :: !is_3d_view :: x = " << mouse_ .cursor.x << " - y= " << mouse_.cursor.y<<std::endl;
             render_2d_view(viewer_rect, window,
                 static_cast<int>(get_output_height()), window.get_font(), window.get_large_font(),
                 devices, window.get_mouse(), error_message);

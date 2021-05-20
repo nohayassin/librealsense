@@ -90,6 +90,7 @@ namespace librealsense
 
     void ds5_auto_exposure_roi_method::set(const region_of_interest& roi)
     {
+        std::cout << "NOHA :: ds5_auto_exposure_roi_method::set "<<std::endl;
         command cmd(_cmd);
         cmd.param1 = roi.min_y;
         cmd.param2 = roi.max_y;
