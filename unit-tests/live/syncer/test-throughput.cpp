@@ -64,11 +64,14 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
     std::map<long long, std::vector<unsigned long long>> frames_num_info; // {fps: frames}
     std::map < configuration, rs2_metadata_type> actual_fps;
     std::map<int, std::string> stream_names;
+    std::mutex mutex_1;
+    std::mutex mutex_2;
     rs2::syncer sync;
-    double prev_fps = 0;
+    float prev_fps = 0;
 
     auto process_frame = [&](const rs2::frame& f)
     {
+        std::lock_guard<std::mutex> lock(mutex_1);
         auto stream_type = std::string(f.get_profile().stream_name());
         // Only IR fps is relevant for this test, IR1 and IR2 have same fps so it is enough to get only one of them
         if (stream_type != "Infrared 1")
@@ -80,22 +83,22 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
         frames_num_info[fps].push_back(frame_num);
     };
 
-    auto validate_ratio = [&](unsigned int delta, configuration test)
+    auto validate_ratio = [&](float delta, configuration test)
     {
+        std::lock_guard<std::mutex> lock(mutex_2);
         for (auto f : frames_num_info)
         {
             std::cout << "Infrared 1 : " << f.first << " fps, " << f.second.size() << " frames" << std::endl;
             if (test == STOP) // after changing exposure to 18000, fps should be changed 60 -> 30
             {
-                double ratio = (double)f.first / prev_fps;
+                float ratio = (float)f.first / prev_fps;
                 REQUIRE(ratio < 0.6);
             }
             prev_fps = (double)f.first;
-            double calc_fps = (double)f.second.size() / delta;
-            double fps_ratio = calc_fps/ f.first;
+            float calc_fps = (float)f.second.size() / delta;
+            float fps_ratio = calc_fps/ f.first;
             CAPTURE(calc_fps, f.second.size(), delta, f.first);
             REQUIRE(fps_ratio > 0.8);
-            
         }
     };
 
@@ -118,7 +121,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
 
         auto t_start = std::chrono::system_clock::now();
         auto t_end = std::chrono::system_clock::now();
-        unsigned int delta = (unsigned int) std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
+        float delta = (float)std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
         while (delta < RECEIVE_FRAMES_TIME)
         {
             auto fs = sync.wait_for_frames();
@@ -127,7 +130,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
                 process_frame(ff);
             }
             t_end = std::chrono::system_clock::now();
-            delta = (unsigned int) std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
+            delta = (float)std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
 
             if (test == IR_RGB_EXPOSURE && delta >= RECEIVE_FRAMES_TIME) // modify exposure 5 seconds after start streaming ( according to repro description )
             {
