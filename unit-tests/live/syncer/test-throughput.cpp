@@ -80,7 +80,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
         frames_num_info[fps].push_back(frame_num);
     };
 
-    auto validate_ratio = [&](uint16_t delta, configuration test)
+    auto validate_ratio = [&](unsigned int delta, configuration test)
     {
         for (auto f : frames_num_info)
         {
@@ -91,7 +91,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
                 REQUIRE(ratio < 0.6);
             }
             prev_fps = (double)f.first;
-            double calc_fps = f.second.size() / delta;
+            double calc_fps = (double)f.second.size() / delta;
             double fps_ratio = calc_fps/ f.first;
             CAPTURE(calc_fps, f.second.size(), delta, f.first);
             REQUIRE(fps_ratio > 0.8);
@@ -118,7 +118,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
 
         auto t_start = std::chrono::system_clock::now();
         auto t_end = std::chrono::system_clock::now();
-        auto delta = std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
+        unsigned int delta = (unsigned int) std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
         while (delta < RECEIVE_FRAMES_TIME)
         {
             auto fs = sync.wait_for_frames();
@@ -127,7 +127,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
                 process_frame(ff);
             }
             t_end = std::chrono::system_clock::now();
-            delta = std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
+            delta = (unsigned int) std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
 
             if (test == IR_RGB_EXPOSURE && delta >= RECEIVE_FRAMES_TIME) // modify exposure 5 seconds after start streaming ( according to repro description )
             {
