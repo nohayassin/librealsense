@@ -94,11 +94,13 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
                 float ratio = (float)f.first / prev_fps;
                 REQUIRE(ratio < 0.6);
             }
-            prev_fps = (double)f.first;
+            auto actual_fps = f.first;
+            auto arrived_frames = f.second.size();
             float calc_fps = (float)f.second.size() / delta;
-            float fps_ratio = calc_fps/ f.first;
-            CAPTURE(calc_fps, f.second.size(), delta, f.first);
+            float fps_ratio = calc_fps / f.first;
+            CAPTURE(calc_fps, arrived_frames, delta, actual_fps);
             REQUIRE(fps_ratio > 0.8);
+            prev_fps = actual_fps;
         }
     };
 
@@ -136,11 +138,13 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
             {
                 validate_ratio(delta, test);
                 test = STOP;
+                ir_sensor.set_option(RS2_OPTION_EXPOSURE, 18000); // set exposure value to x > 1000/fps
+                std::this_thread::sleep_for(std::chrono::milliseconds(200)); // wait 200 msec to process FW command
+                // reset data structure and dt to start a new counting of 5 seconds after exposure is set to the new value and actual fps is reduced to 30
                 delta = 0;
                 frames_num_info.clear();
                 t_start = std::chrono::system_clock::now();
-                ir_sensor.set_option(RS2_OPTION_EXPOSURE, 18000); // set exposure value to x > 1000/fps
-                std::this_thread::sleep_for(std::chrono::milliseconds(500)); // wait 200 msec to process FW command
+                t_end = std::chrono::system_clock::now();
             }
         }
         validate_ratio(delta, test);
