@@ -3,6 +3,7 @@
 
 //#cmake: static!
 //#test:device D400*
+//#test:device L500*
 
 
 #define CATCH_CONFIG_MAIN
@@ -29,7 +30,10 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
             sensor ir_sensor,
             std::vector<rs2::stream_profile > rgb_stream_profile,
             std::vector<rs2::stream_profile > ir_stream_profile) : _rgb_sensor(rgb_sensor), _ir_sensor(ir_sensor), 
-                                                                   _rgb_stream_profile(rgb_stream_profile), _ir_stream_profile(ir_stream_profile) {}
+                                                                   _rgb_stream_profile(rgb_stream_profile), _ir_stream_profile(ir_stream_profile) 
+        {
+            _prev_fps = 0.0f;
+        }
         void test_configuration(configuration test)
         {
             std::cout << "==============================================" << std::endl;
@@ -38,7 +42,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
             
             start_streaming(test);
 
-            bool exposure_cfg[2] = { true, false };
+            bool exposure_cfg[2] = { true, false }; // true means setting exposure to 180000 and false means setting exposure to 1 (min value)
             for (auto exposure : exposure_cfg)
             {
                 if (!set_ir_exposure(exposure))
@@ -47,7 +51,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
                     std::cout << "Configuration is stopped" << std::endl;
                     return;
                 }
-                process_all_frames(test);
+                process_validate_frames(test);
             }
             stop_streaming(test);
         }
@@ -55,22 +59,22 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
     private:
         bool set_ir_exposure(bool exposure)
         {
-            _exposure = 1.0f;
+            std::lock_guard<std::mutex> lock(_mutex); // prevent processing frames while setting exposure
+            _exposure = _ir_sensor.get_option(RS2_OPTION_EXPOSURE);
+            _frames_arrival_info.clear();
             if (_ir_sensor.supports(RS2_OPTION_EXPOSURE))
             {
                 if (exposure)
-                {
                     REQUIRE_NOTHROW(_ir_sensor.set_option(RS2_OPTION_EXPOSURE, 18000)); // set exposure value to x > 1000/fps
-                    _exposure = 180000.0f;
-                }
                 else
                     REQUIRE_NOTHROW(_ir_sensor.set_option(RS2_OPTION_EXPOSURE, 1)); // set exposure value to min value
                 std::this_thread::sleep_for(std::chrono::milliseconds(200)); // wait 200 msec to process FW command
+                _exposure = _ir_sensor.get_option(RS2_OPTION_EXPOSURE);
                 return true;
             }
             return false;
         }
-        void process_all_frames(configuration test)
+        void process_validate_frames(configuration test)
         {
             auto process_frame = [&](const rs2::frame& f)
             {
@@ -80,17 +84,22 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
                 if (stream_type != "Infrared 1")
                     return;
                 auto frame_num = f.get_frame_number();
-                auto fps = f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS);
-                if (!_frames_num_info[fps].empty() && _frames_num_info[fps].back() == frame_num) // check if frame is already processed
+                _actual_fps = (float)f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS); // TODO ??? check only once ?
+                auto frame_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP); // usec
+                if (_frames_arrival_info.find(frame_num) != _frames_arrival_info.end()) // check if frame is already processed
                     return;
-                _frames_num_info[fps].push_back(frame_num);
+                auto fps_ratio = _prev_fps > 0.0f ? _actual_fps / _prev_fps : 1; // make sure frames are received with same fps
+                CAPTURE(_prev_fps, _actual_fps);
+                CHECK(fps_ratio > 0.9);
+                _frames_arrival_info[frame_num] = frame_arrival;
+                _prev_fps = _actual_fps;
             };
             auto t_start = std::chrono::system_clock::now();
             auto t_end = std::chrono::system_clock::now();
             float delta = (float)std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
             while (delta < RECEIVE_FRAMES_TIME)
             {
-                auto fs = sync.wait_for_frames();
+                auto fs = _sync.wait_for_frames();
                 for (const rs2::frame& ff : fs)
                 {
                     process_frame(ff);
@@ -99,21 +108,17 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
                 delta = (float)std::chrono::duration_cast<std::chrono::seconds>(t_end - t_start).count();
             }
             validate_ratio(delta, test);
-            //bool no_drops = frame_drops();
-            //CHECK(no_drops);
-            //CHECK(valid_ratio);
-
-            _frames_num_info.clear();
+            check_frame_drops();
         }
         void start_streaming(configuration test)
         {
             _ir_sensor.set_option(RS2_OPTION_EXPOSURE, 1);
             _ir_sensor.open(_ir_stream_profile); // ir streams in all configurations
-            _ir_sensor.start(sync);
+            _ir_sensor.start(_sync);
             if (test == IR_RGB_EXPOSURE)
             {
                 _rgb_sensor.open(_rgb_stream_profile);
-                _rgb_sensor.start(sync);
+                _rgb_sensor.start(_sync);
             }
         }
         void stop_streaming(configuration test)
@@ -128,36 +133,39 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
         }
         void validate_ratio(float delta, configuration test)
         {
-            for (auto f : _frames_num_info)
+            std::cout << "Infrared 1 : " << _actual_fps << " fps, " << _frames_arrival_info.size() << " frames, " << _exposure << " exposure" << std::endl;
+
+            auto arrived_frames = _frames_arrival_info.size();
+            float calc_fps = (float)_frames_arrival_info.size() / delta;
+            float fps_ratio = calc_fps / _actual_fps;
+            CAPTURE(calc_fps, arrived_frames, delta, _actual_fps);
+            CHECK(fps_ratio > 0.9);
+        }
+        void check_frame_drops()
+        {
+            float expected_dt_ms = 1000/_actual_fps;
+            float prev_frame_time = _frames_arrival_info.begin()->second;// (float)_frames_arrival_info.back();
+            _frames_arrival_info.erase(_frames_arrival_info.begin());
+            for (auto frame_time : _frames_arrival_info)
             {
-                std::cout << "Infrared 1 : " << f.first << " fps, " << f.second.size() << " frames, "<< _exposure<<" exposure" << std::endl;
-                if (test == STOP) // after changing exposure to 18000, fps should be changed 60 -> 30
-                {
-                    float ratio = (float)f.first / prev_fps;
-                    REQUIRE(ratio < 0.6);
-                }
-                auto actual_fps = f.first;
-                auto arrived_frames = f.second.size();
-                float calc_fps = (float)f.second.size() / delta;
-                float fps_ratio = calc_fps / f.first;
-                CAPTURE(calc_fps, arrived_frames, delta, actual_fps);
-                REQUIRE(fps_ratio > 0.8);
-                prev_fps = actual_fps;
+                float calc_dt_msec = ((float)frame_time.second - prev_frame_time)/1000; //convert usec -> msec
+                float dt_msec_ratio = calc_dt_msec / expected_dt_ms;
+                CAPTURE(expected_dt_ms, calc_dt_msec, dt_msec_ratio, frame_time, prev_frame_time);
+                CHECK(dt_msec_ratio > 0.9);
+                prev_frame_time = frame_time.second;
             }
         }
-        //bool frame_drops();
 
         sensor _rgb_sensor;
         sensor _ir_sensor;
         std::vector<rs2::stream_profile > _rgb_stream_profile;
         std::vector<rs2::stream_profile > _ir_stream_profile;
-        std::map<long long, std::vector<unsigned long long>> _frames_num_info; // {fps: frames}
-        std::map < configuration, rs2_metadata_type> _actual_fps;
+        std::map<unsigned long long, float> _frames_arrival_info; //{frame_num : HW timestamp}
+        float _actual_fps;
         float _exposure;
-        //std::map<int, std::string> _stream_names;
         std::mutex _mutex;
-        rs2::syncer sync;
-        float prev_fps = 0;
+        rs2::syncer _sync;
+        float _prev_fps = 0;
     };
 
     // Require at least one device to be plugged in
