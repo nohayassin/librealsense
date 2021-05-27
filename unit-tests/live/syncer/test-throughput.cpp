@@ -29,20 +29,17 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
         ir_cfg(sensor rgb_sensor,
             sensor ir_sensor,
             std::vector<rs2::stream_profile > rgb_stream_profile,
-            std::vector<rs2::stream_profile > ir_stream_profile) : _rgb_sensor(rgb_sensor), _ir_sensor(ir_sensor), 
-                                                                   _rgb_stream_profile(rgb_stream_profile), _ir_stream_profile(ir_stream_profile) 
-        {
-            _prev_fps = 0.0f;
-        }
+            std::vector<rs2::stream_profile > ir_stream_profile) : _rgb_sensor(rgb_sensor), _ir_sensor(ir_sensor),
+            _rgb_stream_profile(rgb_stream_profile), _ir_stream_profile(ir_stream_profile) {}
+         
         void test_configuration(configuration test)
         {
             std::cout << "==============================================" << std::endl;
             std::string cfg = test == IR_ONLY ? "IR Only" : "IR + RGB";
-            std::cout << "Configuration " << cfg << std::endl << std::endl;
+            std::cout << "Configuration: " << cfg << std::endl << std::endl;
             
             start_streaming(test);
-
-            bool exposure_cfg[2] = { true, false }; // true means setting exposure to 180000 and false means setting exposure to 1 (min value)
+            bool exposure_cfg[2] = { false, true }; // true means setting exposure to 180000 and false means setting exposure to 1 (min value)
             for (auto exposure : exposure_cfg)
             {
                 if (!set_ir_exposure(exposure))
@@ -76,6 +73,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
         }
         void process_validate_frames(configuration test)
         {
+            _prev_fps = 0.0f;
             auto process_frame = [&](const rs2::frame& f)
             {
                 std::lock_guard<std::mutex> lock(_mutex);
@@ -84,7 +82,7 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
                 if (stream_type != "Infrared 1")
                     return;
                 auto frame_num = f.get_frame_number();
-                _actual_fps = (float)f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS); // TODO ??? check only once ?
+                _actual_fps = (float)f.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_FPS);
                 auto frame_arrival = f.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP); // usec
                 if (_frames_arrival_info.find(frame_num) != _frames_arrival_info.end()) // check if frame is already processed
                     return;
@@ -143,8 +141,8 @@ TEST_CASE("Syncer dynamic FPS - throughput test", "[live]")
         }
         void check_frame_drops()
         {
-            float expected_dt_ms = 1000/_actual_fps;
-            float prev_frame_time = _frames_arrival_info.begin()->second;// (float)_frames_arrival_info.back();
+            float expected_dt_ms = 1000/_actual_fps; // convert sec -> msec
+            float prev_frame_time = _frames_arrival_info.begin()->second;
             _frames_arrival_info.erase(_frames_arrival_info.begin());
             for (auto frame_time : _frames_arrival_info)
             {
