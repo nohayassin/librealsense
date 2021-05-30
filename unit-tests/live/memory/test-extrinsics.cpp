@@ -3,6 +3,8 @@
 
 //#cmake: static!
 //#test:device D400*
+//#test:device L500*
+//#test:device SR300*
 //#test:donotrun:!nightly
 //#test:timeout 480
 
