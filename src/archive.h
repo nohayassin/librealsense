@@ -30,6 +30,7 @@ namespace librealsense
         rs2_time_t          timestamp = 0;
         unsigned long long  frame_number = 0;
         rs2_timestamp_domain timestamp_domain = RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK;
+        float               depth_units = 0.0f;
         rs2_time_t          system_time = 0; // sys-clock at the time the frame was received from the backend
         rs2_time_t          frame_callback_started = 0; // time when the frame was sent to user callback
         uint32_t            metadata_size = 0;
@@ -48,6 +49,7 @@ namespace librealsense
         frame_additional_data(double in_timestamp,
             unsigned long long in_frame_number,
             double in_system_time,
+            float in_depth_units,
             uint8_t md_size,
             const uint8_t* md_buf,
             double backend_time,
@@ -58,6 +60,7 @@ namespace librealsense
             : timestamp(in_timestamp),
             frame_number(in_frame_number),
             system_time(in_system_time),
+            depth_units(in_depth_units),
             metadata_size(md_size),
             backend_timestamp(backend_time),
             last_timestamp(last_timestamp),

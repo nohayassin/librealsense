@@ -239,6 +239,7 @@ namespace librealsense
         std::shared_ptr<stream_profile_interface> profile)
     {
         auto system_time = environment::get_instance().get_time_service()->get_time();
+        auto depth_units = get_option(RS2_OPTION_DEPTH_UNITS).query();
         auto fr = std::make_shared<frame>();
         byte* pix = (byte*)fo.pixels;
         std::vector<byte> pixels(pix, pix + fo.frame_size);
@@ -249,13 +250,15 @@ namespace librealsense
         frame_additional_data additional_data(0,
             0,
             system_time,
+            depth_units, // NOHA :: added
             static_cast<uint8_t>(fo.metadata_size),
             (const uint8_t*)fo.metadata,
             fo.backend_time,
             last_timestamp,
             last_frame_number,
             false,
-            (uint32_t)fo.frame_size );
+            (uint32_t)fo.frame_size 
+        );
         fr->additional_data = additional_data;
 
         // update additional data
