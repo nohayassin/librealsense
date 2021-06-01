@@ -558,7 +558,11 @@ namespace rs2
         units_transform() : filter(init(), 1) {}
 
     protected:
-        units_transform(std::shared_ptr<rs2_processing_block> block) : filter(block, 1) {}
+        units_transform(std::shared_ptr<rs2_processing_block> block) : filter(block, 1) 
+        {
+            //std::count << "NOHA :: units_transform"<<std::endl;
+            int a = 1;
+        }
 
     private:
         std::shared_ptr<rs2_processing_block> init()

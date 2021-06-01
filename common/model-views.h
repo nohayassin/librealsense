@@ -614,7 +614,7 @@ namespace rs2
             *index = (int)(max_default - values.begin());
             return false;
         }
-
+        std::shared_ptr<sensor> get_sensor() { return s; };
         viewer_model& viewer;
         std::function<void()> on_frame = []{};
         std::shared_ptr<sensor> s;

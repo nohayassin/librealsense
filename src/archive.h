@@ -142,6 +142,15 @@ namespace librealsense
             additional_data.timestamp_domain = timestamp_domain;
         }
 
+        void set_depth_units(float depth_units)
+        {
+            additional_data.depth_units = depth_units;
+        }
+        float get_depth_units()
+        {
+            return additional_data.depth_units;
+        }
+
         rs2_time_t get_frame_system_time() const override;
 
         std::shared_ptr<stream_profile_interface> get_stream() const override { return stream; }

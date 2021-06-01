@@ -89,7 +89,7 @@ void init_sensor(py::module &m) {
 
     py::class_<rs2::depth_sensor, rs2::sensor> depth_sensor(m, "depth_sensor"); // No docstring in C++
     depth_sensor.def(py::init<rs2::sensor>(), "sensor"_a)
-        .def("get_depth_scale", &rs2::depth_sensor::get_depth_scale,
+        .def("get_depth_scale", &rs2::depth_sensor::get_depth_scale_1,
             "Retrieves mapping between the units of the depth image and meters.");
 
     py::class_<rs2::color_sensor, rs2::sensor> color_sensor(m, "color_sensor"); // No docstring in C++

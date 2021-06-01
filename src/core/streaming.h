@@ -321,6 +321,7 @@ namespace librealsense
     class depth_sensor : public recordable<depth_sensor>
     {
     public:
+        virtual float get_depth_scale_1(bool) const = 0;
         virtual float get_depth_scale() const = 0;
         virtual ~depth_sensor() = default;
     };
@@ -331,11 +332,14 @@ namespace librealsense
     {
     public:
         depth_sensor_snapshot(float depth_units) : m_depth_units(depth_units) {}
+        float get_depth_scale_1(bool reset) const override
+        {
+            return m_depth_units;
+        }
         float get_depth_scale() const override
         {
             return m_depth_units;
         }
-
         void update(std::shared_ptr<extension_snapshot> ext) override
         {
             if (auto api = As<depth_sensor>(ext))

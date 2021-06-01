@@ -468,13 +468,21 @@ namespace rs2
         /** Retrieves mapping between the units of the depth image and meters
         * \return depth in meters corresponding to a depth value of 1
         */
-        float get_depth_scale() const
+        float get_depth_scale(bool reset = false) const
         {
             rs2_error* e = nullptr;
-            auto res = rs2_get_depth_scale(_sensor.get(), &e);
+            auto res = rs2_get_depth_scale_1(_sensor.get(), &e, reset);
             error::handle(e);
             return res;
         }
+
+        /*float query_depth_scale() const
+        {
+            rs2_error* e = nullptr;
+            auto res = rs2_query_depth_scale(_sensor.get(), &e);
+            error::handle(e);
+            return res;
+        }*/
 
         operator bool() const { return _sensor.get() != nullptr; }
         explicit depth_sensor(std::shared_ptr<rs2_sensor> dev) : depth_sensor(sensor(dev)) {}

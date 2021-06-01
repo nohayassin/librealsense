@@ -2309,6 +2309,14 @@ rs2_processing_block* rs2_create_sequence_id_filter(rs2_error** error) BEGIN_API
 }
 NOARGS_HANDLE_EXCEPTIONS_AND_RETURN(nullptr)
 
+float rs2_get_depth_scale_1(rs2_sensor* sensor, rs2_error** error, bool reset) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(sensor);
+    auto ds = VALIDATE_INTERFACE(sensor->sensor, librealsense::depth_sensor);
+    return ds->get_depth_scale_1(reset);
+}
+HANDLE_EXCEPTIONS_AND_RETURN(0.f, sensor)
+
 float rs2_get_depth_scale(rs2_sensor* sensor, rs2_error** error) BEGIN_API_CALL
 {
     VALIDATE_NOT_NULL(sensor);
@@ -2316,6 +2324,14 @@ float rs2_get_depth_scale(rs2_sensor* sensor, rs2_error** error) BEGIN_API_CALL
     return ds->get_depth_scale();
 }
 HANDLE_EXCEPTIONS_AND_RETURN(0.f, sensor)
+
+/*float rs2_query_depth_scale(rs2_sensor* sensor, rs2_error** error) BEGIN_API_CALL
+{
+    VALIDATE_NOT_NULL(sensor);
+    auto ds = VALIDATE_INTERFACE(sensor->sensor, librealsense::depth_sensor);
+    return ds->query_depth_scale();
+}
+HANDLE_EXCEPTIONS_AND_RETURN(0.f, sensor)*/
 
 float rs2_get_max_usable_depth_range(rs2_sensor const * sensor, rs2_error** error) BEGIN_API_CALL
 {

@@ -2113,7 +2113,8 @@ namespace rs2
 
                 if (next == RS2_OPTION_DEPTH_UNITS)
                 {
-                    opt_md.dev->depth_units = opt_md.value;
+                    auto val = get_sensor()->as<depth_sensor>().get_depth_scale(true);
+                    opt_md.dev->depth_units = opt_md.value; // NOHA :: this is the first place reached when depth units is changed !!!
                 }
 
                 if (next == RS2_OPTION_STEREO_BASELINE)

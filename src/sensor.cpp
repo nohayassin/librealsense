@@ -937,6 +937,7 @@ namespace librealsense
     {
         register_metadata(RS2_FRAME_METADATA_BACKEND_TIMESTAMP, make_additional_data_parser(&frame_additional_data::backend_timestamp));
         register_metadata(RS2_FRAME_METADATA_RAW_FRAME_SIZE, make_additional_data_parser(&frame_additional_data::raw_size));
+        register_metadata(RS2_FRAME_METADATA_DEPTH_UNITS, make_additional_data_parser(&frame_additional_data::depth_units));
     }
 
     iio_hid_timestamp_reader::iio_hid_timestamp_reader()
@@ -1551,6 +1552,12 @@ namespace librealsense
     {
         std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
         _raw_sensor->stop();
+    }
+
+    void synthetic_sensor::depth_units()
+    {
+        std::lock_guard<std::mutex> lock(_synthetic_configure_lock);
+        _raw_sensor->close();
     }
 
     float librealsense::synthetic_sensor::get_preset_max_value() const

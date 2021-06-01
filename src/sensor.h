@@ -209,6 +209,8 @@ namespace librealsense
         void start(frame_callback_ptr callback) override;
         void stop() override;
 
+        void depth_units(); // NOHA : added
+
         virtual float get_preset_max_value() const;
 
         void register_processing_block(const std::vector<stream_profile>& from,
