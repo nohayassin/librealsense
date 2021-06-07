@@ -3,6 +3,9 @@
 
 #include <librealsense2/rs.hpp>
 #include "example-imgui.hpp"
+#include <librealsense2-gl/rs_processing_gl.hpp> // Include GPU-Processing API
+#include <chrono>
+#include <thread>
 
 /*
  This example introduces the concept of spatial stream alignment.
@@ -40,7 +43,7 @@ int main(int argc, char * argv[]) try
     // Create and initialize GUI related objects
     window app(1280, 720, "RealSense Align Example"); // Simple window handling
     ImGui_ImplGlfw_Init(app, false);      // ImGui library intializition
-    rs2::colorizer c;                     // Helper to colorize depth images
+    rs2::gl::colorizer c;                     // Helper to colorize depth images
     texture depth_image, color_image;     // Helpers for renderig images
 
     // Create a pipeline to easily configure and start the camera
@@ -56,14 +59,36 @@ int main(int argc, char * argv[]) try
     // to depth viewport and the other to color.
     // Creating align object is an expensive operation
     // that should not be performed in the main loop
-    rs2::align align_to_depth(RS2_STREAM_DEPTH);
-    rs2::align align_to_color(RS2_STREAM_COLOR);
+    rs2::gl::align align_to_depth(RS2_STREAM_DEPTH);
+    rs2::gl::align align_to_color(RS2_STREAM_COLOR);
 
     float       alpha = 0.5f;               // Transparancy coefficient 
     direction   dir = direction::to_depth;  // Alignment direction
-
+    float set_value[5] = { 0.0004, 0.00055, 0.007, 0.008, 0.01 };
+    int i = 0;
     while (app) // Application still alive?
     {
+        // set new value for depth units
+        //_ir_sensor
+        rs2::context ctx;
+        auto devs = ctx.query_devices();
+        i = i % 4;
+        for (auto dev : devs)
+        {
+            for (auto& sensor : dev.query_sensors())
+            {
+                if (sensor.supports(RS2_OPTION_DEPTH_UNITS))
+                {
+                    //auto range = sensor.get_option_range(RS2_OPTION_DEPTH_UNITS); // (0-100)/10000
+                    sensor.set_option(RS2_OPTION_DEPTH_UNITS, set_value[i]);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                    std::cout << "NOHA :: Depth Units = " << sensor.get_option(RS2_OPTION_DEPTH_UNITS) <<std::endl;
+                }
+            }
+
+        }
+        i += 1;
+
         // Using the align object, we block the application until a frameset is available
         rs2::frameset frameset = pipe.wait_for_frames();
 
