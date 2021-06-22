@@ -1,6 +1,8 @@
+#!/bin/bash
+
 # make sure jupyter has enough data for complex meshes
-mkdir $HOME/.jupyter
-echo "c.NotebookApp.iopub_data_rate_limit=1e22" >> $HOME/.jupyter/jupyter_notebook_config.py
+mkdir %homepath%/.jupyter
+echo "c.NotebookApp.iopub_data_rate_limit=1e22" >> %homepath%/.jupyter/jupyter_notebook_config.py
 
 # enable appmode for nice demos
 jupyter nbextension enable --py --sys-prefix widgetsnbextension
